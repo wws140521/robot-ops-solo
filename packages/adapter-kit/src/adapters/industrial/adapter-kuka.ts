@@ -1,0 +1,84 @@
+/**
+ * KUKA OPC UA → UnifiedRobotState 适配器
+ */
+import type { UnifiedRobotState, UnifiedAlert } from '../../types/unified';
+import type {
+  JointTelemetry,
+  IndustrialAlarm,
+  IndustrialRuntime,
+  IndustrialExtension,
+} from '../../types/industrial';
+import type { AlarmSeverity } from '../../types/industrial';
+
+const KUKA_ALARM_MAP: Record<string, { udm_code: string; severity: AlarmSeverity; zh_desc: string }> = {
+  KSS15002: { udm_code: 'DRIVE_FAULT', severity: 'error', zh_desc: '驱动器故障' },
+  KSS15012: { udm_code: 'COMM_LOST', severity: 'error', zh_desc: '通信中断' },
+  KSS15103: { udm_code: 'OVER_TEMP', severity: 'warn', zh_desc: '轴温过高' },
+  KSS15202: { udm_code: 'BREAKER_OPEN', severity: 'critical', zh_desc: '断路器断开' },
+};
+
+export function adaptKuka(
+  raw: any
+): { state: UnifiedRobotState; alerts: UnifiedAlert[] } {
+  const joints: JointTelemetry[] = (raw.joints || []).map((j: any) => ({
+    j: j.j,
+    load_pct: j.load_pct ?? 0,
+    temp_c: j.temp_c,
+    current_a: j.current_a,
+    speed_rpm: j.speed_rpm,
+    health_score: j.health_score ?? 100,
+    rul_days: j.rul_days,
+  }));
+
+  const alarms: IndustrialAlarm[] = (raw.alarms || []).map((a: any) => {
+    const mapped = KUKA_ALARM_MAP[a.raw_code] || {
+      udm_code: 'UNKNOWN',
+      severity: 'warn' as AlarmSeverity,
+      zh_desc: a.zh_desc || '未知告警',
+    };
+    return {
+      raw_code: a.raw_code,
+      udm_code: mapped.udm_code,
+      severity: mapped.severity,
+      zh_desc: mapped.zh_desc,
+      occurred_at: a.occurred_at || new Date().toISOString(),
+      cleared: a.cleared ?? false,
+    };
+  });
+
+  const runtime: IndustrialRuntime = {
+    power_on_hours: raw.runtime?.power_on_hours ?? 0,
+    cycle_count: raw.runtime?.cycle_count ?? 0,
+    last_maintenance_at: raw.runtime?.last_maintenance_at,
+  };
+
+  const industrial: IndustrialExtension = {
+    joints,
+    alarms,
+    runtime,
+    protocol: 'OPC_UA',
+  };
+
+  const state: UnifiedRobotState = {
+    robotId: raw.robot_id || `kuka-${Date.now()}`,
+    brand: 'KUKA',
+    model: raw.model || 'Unknown',
+    batteryPct: 0,
+    voltage: 0,
+    online: true,
+    position: { x: 0, y: 0, theta: 0 },
+    status: 'working',
+    lastSeen: Date.now(),
+    industrial,
+  };
+
+  const unifiedAlerts: UnifiedAlert[] = alarms.map((a) => ({
+    robotId: state.robotId,
+    level: a.severity === 'critical' ? 'error' : (a.severity as 'info' | 'warn' | 'error'),
+    code: a.raw_code,
+    message: `[${a.raw_code}] ${a.zh_desc}`,
+    timestamp: Date.now(),
+  }));
+
+  return { state, alerts: unifiedAlerts };
+}

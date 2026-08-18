@@ -1,0 +1,35 @@
+brand: FANUC
+model: M-20iD/25
+host: 192.168.1.100
+port: 8193
+protocol: FOCAS
+sample_interval_sec: 5
+
+# R 寄存器映射（KAREL 桥接：机器人侧把温度/负载写进这些 R）
+r_map:
+  j1_temp: 100
+  j2_temp: 101
+  j3_temp: 102
+  j4_temp: 103
+  j5_temp: 104
+  j6_temp: 105
+  j1_load: 110
+  j2_load: 111
+  j3_load: 112
+  j4_load: 113
+  j5_load: 114
+  j6_load: 115
+
+# 报警码字典
+alarm_dict:
+  SRVO-023: { udm_code: OVER_TEMP_J2, severity: warn, zh_desc: "2轴伺服过热" }
+  SRVO-050: { udm_code: BREAKER_OPEN, severity: error, zh_desc: "伺服断开" }
+  SRVO-062: { udm_code: HTAL_ALARM, severity: critical, zh_desc: "硬件过热报警" }
+  SRVO-075: { udm_code: PULSE_MISMATCH, severity: error, zh_desc: "脉冲不匹配" }
+
+# MQTT 输出
+mqtt:
+  host: localhost
+  port: 1883
+  topic: industrial/robot/fanuc/telemetry
+  alert_topic: industrial/robot/fanuc/alert

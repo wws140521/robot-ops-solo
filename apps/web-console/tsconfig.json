@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "jsx": "react-jsx",
+    "paths": {
+      "robot-adapter-kit": ["../../packages/adapter-kit/src/index.ts"],
+      "sop-editor": ["../../packages/sop-editor/src/index.ts"],
+      "digital-twin": ["../../packages/digital-twin/src/index.ts"],
+      "ui-kit": ["../../packages/ui-kit/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*"]
+}

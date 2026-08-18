@@ -1,0 +1,85 @@
+/**
+ * 安川 Ethernet → UnifiedRobotState 适配器
+ */
+import type { UnifiedRobotState, UnifiedAlert } from '../../types/unified';
+import type {
+  JointTelemetry,
+  IndustrialAlarm,
+  IndustrialRuntime,
+  IndustrialExtension,
+} from '../../types/industrial';
+import type { AlarmSeverity } from '../../types/industrial';
+
+const YASKAWA_ALARM_MAP: Record<string, { udm_code: string; severity: AlarmSeverity; zh_desc: string }> = {
+  '4100': { udm_code: 'SERVO_ALARM', severity: 'error', zh_desc: '伺服报警' },
+  '4110': { udm_code: 'OVER_TEMP', severity: 'warn', zh_desc: '伺服过热' },
+  '4200': { udm_code: 'COMM_ERR', severity: 'error', zh_desc: '通信错误' },
+  '4300': { udm_code: 'BREAKER_OPEN', severity: 'critical', zh_desc: '主回路断路器断开' },
+  '4400': { udm_code: 'ENCODER_ERR', severity: 'error', zh_desc: '编码器异常' },
+};
+
+export function adaptYaskawa(
+  raw: any
+): { state: UnifiedRobotState; alerts: UnifiedAlert[] } {
+  const joints: JointTelemetry[] = (raw.joints || []).map((j: any) => ({
+    j: j.j,
+    load_pct: j.load_pct ?? 0,
+    temp_c: j.temp_c,
+    current_a: j.current_a,
+    speed_rpm: j.speed_rpm,
+    health_score: j.health_score ?? 100,
+    rul_days: j.rul_days,
+  }));
+
+  const alarms: IndustrialAlarm[] = (raw.alarms || []).map((a: any) => {
+    const mapped = YASKAWA_ALARM_MAP[a.raw_code] || {
+      udm_code: 'UNKNOWN',
+      severity: 'warn' as AlarmSeverity,
+      zh_desc: a.zh_desc || '未知告警',
+    };
+    return {
+      raw_code: a.raw_code,
+      udm_code: mapped.udm_code,
+      severity: mapped.severity,
+      zh_desc: mapped.zh_desc,
+      occurred_at: a.occurred_at || new Date().toISOString(),
+      cleared: a.cleared ?? false,
+    };
+  });
+
+  const runtime: IndustrialRuntime = {
+    power_on_hours: raw.runtime?.power_on_hours ?? 0,
+    cycle_count: raw.runtime?.cycle_count ?? 0,
+    last_maintenance_at: raw.runtime?.last_maintenance_at,
+  };
+
+  const industrial: IndustrialExtension = {
+    joints,
+    alarms,
+    runtime,
+    protocol: 'ETHERNET_YASKAWA',
+  };
+
+  const state: UnifiedRobotState = {
+    robotId: raw.robot_id || `yaskawa-${Date.now()}`,
+    brand: 'YASKAWA',
+    model: raw.model || 'Unknown',
+    batteryPct: 0,
+    voltage: 0,
+    online: true,
+    position: { x: 0, y: 0, theta: 0 },
+    status: 'working',
+    lastSeen: Date.now(),
+    industrial,
+  };
+
+  const unifiedAlerts: UnifiedAlert[] = alarms.map((a) => ({
+    robotId: state.robotId,
+    level: a.severity === 'critical' ? 'error' : (a.severity as 'info' | 'warn' | 'error'),
+    code: a.raw_code,
+    message: `[${a.raw_code}] ${a.zh_desc}`,
+    timestamp: Date.now(),
+  }));
+
+  return { state, alerts: unifiedAlerts };
+}

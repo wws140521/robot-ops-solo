@@ -1,0 +1,22 @@
+{
+  "name": "robot-ops-solo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter web-console dev",
+    "build": "pnpm --filter web-console build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "mock": "node mock-ws-server.js",
+    "dev:industrial": "node mock-ws-server.js & pnpm --filter web-console dev",
+    "test:adapter-kit": "pnpm --filter adapter-kit test",
+    "build:all": "pnpm -r build"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "prettier": "^3.3.0",
+    "ws": "^8.18.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}
