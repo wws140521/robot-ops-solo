@@ -57,6 +57,7 @@ export function adaptEstun(
     alarms,
     runtime,
     protocol: 'MODBUS_TCP',
+    extensions: raw.extensions,
   };
 
   const state: UnifiedRobotState = {
@@ -66,7 +67,9 @@ export function adaptEstun(
     batteryPct: 0,
     voltage: 0,
     online: true,
-    position: { x: 0, y: 0, theta: 0 },
+    position: raw.pose
+      ? { x: raw.pose.x, y: raw.pose.y, theta: (raw.pose.rz ?? 0) * Math.PI / 180 }
+      : { x: 0, y: 0, theta: 0 },
     status: 'working',
     lastSeen: Date.now(),
     industrial,

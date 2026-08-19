@@ -299,6 +299,52 @@ wssKeenon.on('connection', (ws) => {
 // 工业机器人 Mock 数据：FANUC / KUKA / 埃斯顿 轮流广播
 // 消息格式：{ type: 'industrial_state', brand: 'fanuc'|'kuka'|'estun', payload: { ... } }
 
+// 工业机器人告警池（按品牌分组，模拟真实报警码）
+const INDUSTRIAL_ALARM_POOLS = {
+  fanuc: [
+    { raw_code: 'SRVO-062', udm_code: 'SERVO_AMP_OVERHEAT', severity: 'warning', zh_desc: '伺服放大器过热' },
+    { raw_code: 'SRVO-075', udm_code: 'J2_OVERSPEED', severity: 'error', zh_desc: '关节 2 超速' },
+    { raw_code: 'SRVO-214', udm_code: 'BRAKE_TEMP_HIGH', severity: 'warning', zh_desc: '制动器温度高' },
+    { raw_code: 'INTP-311', udm_code: 'PROGRAM_PAUSE', severity: 'info', zh_desc: '程序暂停' },
+  ],
+  kuka: [
+    { raw_code: 'KSS-150', udm_code: 'SERVO_OVERLOAD', severity: 'error', zh_desc: '伺服过载' },
+    { raw_code: 'KSS-220', udm_code: 'SAFETY_DOOR_OPEN', severity: 'warning', zh_desc: '安全门已打开' },
+    { raw_code: 'KSS-340', udm_code: 'TOOL collisions', severity: 'warning', zh_desc: '工具碰撞检测' },
+  ],
+  estun: [
+    { raw_code: 'EST-3003', udm_code: 'DRIVE_OVERHEAT', severity: 'warning', zh_desc: '驱动器过热' },
+    { raw_code: 'EST-3008', udm_code: 'ENCODER_ERROR', severity: 'error', zh_desc: '编码器异常' },
+    { raw_code: 'EST-4001', udm_code: 'COMM_LOSS', severity: 'warning', zh_desc: '通信中断' },
+  ],
+}
+
+// 随机生成工业告警（15% 概率每次发一条）
+function generateIndustrialAlarms(brand) {
+  if (Math.random() > 0.15) return []
+  const pool = INDUSTRIAL_ALARM_POOLS[brand] || []
+  if (pool.length === 0) return []
+  const alarm = pool[Math.floor(Math.random() * pool.length)]
+  return [{
+    ...alarm,
+    occurred_at: new Date().toISOString(),
+    cleared: false,
+  }]
+}
+
+// 生成工业机械臂 6 轴笛卡尔 pose（模拟 TCP 位置）
+function generateIndustrialPose(seed) {
+  const r = (min, max) => +(min + Math.random() * (max - min)).toFixed(1)
+  return {
+    x: r(-500, 500),
+    y: r(-500, 500),
+    z: r(0, 1500),
+    rx: r(-180, 180),
+    ry: r(-180, 180),
+    rz: r(-180, 180),
+  }
+}
+
 function mockFanucTelemetry() {
   const now = new Date().toISOString()
   return {
@@ -308,6 +354,7 @@ function mockFanucTelemetry() {
       robot_id: 'FANUC_M20iD_001',
       model: 'M-20iD/25',
       timestamp: now,
+      pose: generateIndustrialPose(),
       joints: [
         { j: 1, load_pct: 62, temp_c: 41, current_a: 3.1, speed_rpm: 120, health_score: 88 },
         { j: 2, load_pct: 118, temp_c: 67, current_a: 5.4, speed_rpm: 90, health_score: 54, rul_days: 9 },
@@ -316,20 +363,20 @@ function mockFanucTelemetry() {
         { j: 5, load_pct: 25, temp_c: 33, current_a: 1.2, speed_rpm: 180, health_score: 97 },
         { j: 6, load_pct: 18, temp_c: 31, current_a: 0.9, speed_rpm: 240, health_score: 99 },
       ],
-      alarms: [{
-        raw_code: 'SRVO-023',
-        udm_code: 'OVER_TEMP_J2',
-        severity: 'warn',
-        zh_desc: '2轴伺服过热',
-        occurred_at: now,
-        cleared: false,
-      }],
+      alarms: generateIndustrialAlarms('fanuc'),
       runtime: {
         power_on_hours: 18432,
         operating_hours: 15200,
         cycle_count: 120321,
         last_maintenance_at: '2026-06-15T10:00:00+08:00',
         payload_kg: 12,
+      },
+      extensions: {
+        r_register_200: Math.floor(Math.random() * 100),
+        d_parameter_101: +(5 + Math.random() * 2).toFixed(2),
+        tool_life_remaining: Math.floor(800 + Math.random() * 200),
+        macro_status: 'M98 P1001',
+        servo_alarm_history: '无',
       },
     },
   }
@@ -344,6 +391,7 @@ function mockKukaTelemetry() {
       robot_id: 'KUKA_KR6_001',
       model: 'KR 6 R900 sixx',
       timestamp: now,
+      pose: generateIndustrialPose(),
       joints: [
         { j: 1, load_pct: 35, temp_c: 36, current_a: 2.0, speed_rpm: 100, health_score: 90 },
         { j: 2, load_pct: 55, temp_c: 42, current_a: 3.0, speed_rpm: 80, health_score: 82 },
@@ -352,11 +400,18 @@ function mockKukaTelemetry() {
         { j: 5, load_pct: 18, temp_c: 30, current_a: 0.8, speed_rpm: 200, health_score: 97 },
         { j: 6, load_pct: 12, temp_c: 28, current_a: 0.5, speed_rpm: 220, health_score: 99 },
       ],
-      alarms: [],
+      alarms: generateIndustrialAlarms('kuka'),
       runtime: {
         power_on_hours: 12300,
         cycle_count: 85000,
         last_maintenance_at: '2026-07-01T10:00:00+08:00',
+      },
+      extensions: {
+        safety_gate_open: Math.random() > 0.8,
+        robroot_offset_x: +(Math.random() * 0.5).toFixed(3),
+        robroot_offset_y: +(Math.random() * 0.5).toFixed(3),
+        safety_controller_state: 'ACTIVE',
+        axis_soft_limit: '正常',
       },
     },
   }
@@ -371,6 +426,7 @@ function mockEstunTelemetry() {
       robot_id: 'ESTUN_ER3A_001',
       model: 'ER3A-C60',
       timestamp: now,
+      pose: generateIndustrialPose(),
       joints: [
         { j: 1, load_pct: 28, temp_c: 34, current_a: 1.5, speed_rpm: 90, health_score: 93 },
         { j: 2, load_pct: 42, temp_c: 39, current_a: 2.3, speed_rpm: 75, health_score: 85 },
@@ -379,17 +435,15 @@ function mockEstunTelemetry() {
         { j: 5, load_pct: 15, temp_c: 29, current_a: 0.6, speed_rpm: 170, health_score: 98 },
         { j: 6, load_pct: 10, temp_c: 27, current_a: 0.4, speed_rpm: 200, health_score: 99 },
       ],
-      alarms: [{
-        raw_code: 'EST-3003',
-        udm_code: 'OVER_TEMP',
-        severity: 'warn',
-        zh_desc: '驱动器过热',
-        occurred_at: now,
-        cleared: false,
-      }],
+      alarms: generateIndustrialAlarms('estun'),
       runtime: {
         power_on_hours: 5600,
         cycle_count: 42000,
+      },
+      extensions: {
+        energy_consumption: +(1.2 + Math.random() * 0.8).toFixed(2),
+        plc_extension: 'M1 Y0',
+        custom_alarm_word: 0,
       },
     },
   }

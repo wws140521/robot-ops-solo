@@ -42,6 +42,8 @@ export interface IndustrialExtension {
   alarms: IndustrialAlarm[];
   runtime: IndustrialRuntime;
   protocol: string;       // "FOCAS" | "OPC_UA" | "MODBUS_TCP" | "ETHERNET_KRL"
+  /** 品牌特有扩展数据（R 寄存器/安全门状态等） */
+  extensions?: Record<string, string | number | boolean>;
 }
 
 // ─── 协议适配配置（YAML 映射源） ────────────────

@@ -6,6 +6,11 @@ import { sendCommand } from '../lib/wsHub'
 import { AlertItem } from 'ui-kit'
 import { RobotViewer, FanucArm, KukaArm } from 'digital-twin'
 import { AIInsightPanel } from '../components/overlays/AIInsightPanel'
+import { HealthGauge } from '../components/HealthGauge'
+import { ExtensionPanel } from '../components/ExtensionPanel'
+import { TrendChart } from '../components/TrendChart'
+import { isIndustrialArm } from '../lib/robotType'
+import { getBrandConfig } from '../lib/brandRegistry'
 import { Canvas } from '@react-three/fiber'
 
 // 工业品牌集合
@@ -249,10 +254,16 @@ export function RobotsPage() {
                     style={{
                       fontSize: 10,
                       fontFamily: 'var(--font-mono)',
-                      color: 'var(--text-tertiary)',
+                      color: isIndustrialArm(r.brand)
+                        ? 'var(--alert-warn)'
+                        : r.batteryPct < 20
+                        ? 'var(--status-error)'
+                        : 'var(--text-tertiary)',
                     }}
                   >
-                    {r.batteryPct}%
+                    {isIndustrialArm(r.brand)
+                      ? `${r.industrial?.joints?.[0]?.load_pct ?? 0}% 负载`
+                      : `${r.batteryPct}%`}
                   </span>
                 </div>
               )
@@ -377,6 +388,21 @@ export function RobotsPage() {
                 </div>
               </div>
 
+              {/* 工业机器人：健康分仪表盘 */}
+              {selected.industrial && (() => {
+                const scores = selected.industrial.joints
+                  .map((j) => j.health_score ?? 85)
+                  .filter((s) => s > 0)
+                const avg = scores.length > 0
+                  ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+                  : 85
+                return (
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                    <HealthGauge score={avg} size={100} />
+                  </div>
+                )
+              })()}
+
               <SectionLabel>坐标 POSITION</SectionLabel>
               <div
                 style={{
@@ -401,51 +427,66 @@ export function RobotsPage() {
               </div>
 
               <SectionLabel>电量 BATTERY</SectionLabel>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  marginBottom: 16,
-                }}
-              >
+              {isIndustrialArm(selected.brand) ? (
                 <div
                   style={{
-                    flex: 1,
-                    height: 8,
-                    borderRadius: 4,
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-sm)',
                     background: 'var(--bg-elev-2)',
-                    overflow: 'hidden',
+                    fontSize: 12,
+                    color: 'var(--text-tertiary)',
+                    marginBottom: 16,
+                  }}
+                >
+                  工业机械臂 · 无电池（外接电源供电）
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    marginBottom: 16,
                   }}
                 >
                   <div
                     style={{
-                      width: `${selected.batteryPct}%`,
-                      height: '100%',
-                      background:
+                      flex: 1,
+                      height: 8,
+                      borderRadius: 4,
+                      background: 'var(--bg-elev-2)',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${selected.batteryPct}%`,
+                        height: '100%',
+                        background:
+                          selected.batteryPct < 20
+                            ? 'var(--status-error)'
+                            : selected.batteryPct < 50
+                            ? 'var(--status-working)'
+                            : 'var(--status-online)',
+                        transition: 'width 0.3s',
+                      }}
+                    />
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      fontFamily: 'var(--font-mono)',
+                      color:
                         selected.batteryPct < 20
                           ? 'var(--status-error)'
-                          : selected.batteryPct < 50
-                          ? 'var(--status-working)'
-                          : 'var(--status-online)',
-                      transition: 'width 0.3s',
+                          : 'var(--text-primary)',
                     }}
-                  />
+                  >
+                    {selected.batteryPct}%
+                  </span>
                 </div>
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    fontFamily: 'var(--font-mono)',
-                    color:
-                      selected.batteryPct < 20
-                        ? 'var(--status-error)'
-                        : 'var(--text-primary)',
-                  }}
-                >
-                  {selected.batteryPct}%
-                </span>
-              </div>
+              )}
 
               <SectionLabel>电压 VOLTAGE</SectionLabel>
               <div
@@ -456,7 +497,9 @@ export function RobotsPage() {
                   marginBottom: 16,
                 }}
               >
-                {selected.voltage.toFixed(1)} V
+                {isIndustrialArm(selected.brand)
+                  ? `${selected.industrial?.protocol || 'N/A'} 协议`
+                  : `${selected.voltage.toFixed(1)} V`}
               </div>
 
               <SectionLabel>状态 STATUS</SectionLabel>
@@ -555,9 +598,33 @@ export function RobotsPage() {
                     </>
                   )}
 
+                  {/* 品牌特有扩展数据 */}
+                  {selected.industrial && (
+                    <>
+                      <SectionLabel>品牌扩展 EXTENSIONS</SectionLabel>
+                      <ExtensionPanel
+                        extensions={selected.industrial.extensions}
+                        brand={selected.brand}
+                      />
+                    </>
+                  )}
+
                   {/* AI 洞察面板 */}
                   {selected.industrial && (
                     <AIInsightPanel robotId={selected.robotId} industrial={selected.industrial} />
+                  )}
+
+                  {/* 实时趋势图 */}
+                  {selected.industrial && (
+                    <>
+                      <SectionLabel>实时趋势 TRENDS</SectionLabel>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                        <TrendChart robot={selected} metric="temp_c" jointIndex={1} height={100} />
+                        <TrendChart robot={selected} metric="load_pct" jointIndex={1} height={100} />
+                        <TrendChart robot={selected} metric="current_a" jointIndex={1} height={100} />
+                        <TrendChart robot={selected} metric="health_score" height={100} />
+                      </div>
+                    </>
                   )}
                 </>
               ) : (

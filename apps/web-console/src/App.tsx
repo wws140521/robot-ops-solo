@@ -114,7 +114,11 @@ export default function App() {
         { brand: 'fanuc', url: 'ws://localhost:8082', robotId: 'industrial-hub' },
       ])
     }
-    return () => stopAllWS()
+    // 每 5 秒检查离线状态：超过 15 秒未收到消息的机器人标记为离线
+    const staleTimer = setInterval(() => {
+      useRobotStore.getState().markOfflineIfStale()
+    }, 5000)
+    return () => { stopAllWS(); clearInterval(staleTimer) }
   }, [])
 
   // 鉴权未就绪时显示 loading

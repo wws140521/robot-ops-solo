@@ -1,12 +1,16 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useRobotStore } from '../stores/robotStore'
 import { useAlertStore } from '../stores/alertStore'
 import { useThemeStore } from '../stores/themeStore'
 import { RobotStatusCard, BatteryGauge, AlertItem } from 'ui-kit'
 import type { UnifiedRobotState } from 'robot-adapter-kit'
-import { Download, Plus, Bot, BatteryCharging, Bell, LayoutGrid, CheckCircle2, X } from 'lucide-react'
+import { Download, Plus, Bot, BatteryCharging, Bell, LayoutGrid, CheckCircle2, X, Factory } from 'lucide-react'
+import { RobotCards } from '../components/RobotCards'
+import { getBrandConfig } from '../lib/brandRegistry'
 
 export function Dashboard() {
+  const navigate = useNavigate()
   const { robots, onlineCount, addRobot } = useRobotStore()
   const alerts = useAlertStore((s) => s.alerts)
   const clearAlerts = useAlertStore((s) => s.clearAlerts)
@@ -253,9 +257,24 @@ export function Dashboard() {
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><CheckCircle2 size={16} /> 无告警，一切正常</span>
             </div>
           ) : (
-            alerts.slice(0, 8).map((a, i) => (
-              <AlertItem key={i} alert={a} onDismiss={clearAlerts} />
-            ))
+            alerts.slice(0, 10).map((a, i) => {
+              const robot = robots[a.robotId]
+              const brandCfg = getBrandConfig(robot?.brand || '')
+              return (
+                <div
+                  key={i}
+                  onClick={() => navigate(`/robots/${a.robotId}`)}
+                  style={{
+                    cursor: 'pointer',
+                    transition: 'opacity 0.15s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+                >
+                  <AlertItem alert={a} onDismiss={clearAlerts} brandColor={brandCfg.color} />
+                </div>
+              )
+            })
           )}
         </div>
       </div>

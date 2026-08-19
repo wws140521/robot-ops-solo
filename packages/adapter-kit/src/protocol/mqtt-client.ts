@@ -3,9 +3,9 @@ import mqtt from 'mqtt';
 import type { UnifiedRobotState, UnifiedAlert } from '../types/unified';
 import { adaptByBrandEnhanced } from '../adapters';
 
-// broker 地址 + 工业遥测主题
+// broker 地址 + 工业遥测主题（与 fanuc_mock.py / kuka_mock.py 发布主题一致）
 const MQTT_BROKER = 'ws://localhost:9001';   // MQTT over WebSocket（浏览器用）
-const TELEMETRY_TOPIC = 'industrial/robot/+/telemetry';
+const TELEMETRY_TOPIC = 'roboticsops/telemetry';
 
 // 回调函数，由 wsHub 注入
 type TelemetryCallback = (state: UnifiedRobotState, alerts: UnifiedAlert[]) => void;
@@ -24,7 +24,10 @@ export function connectMqtt(callback: TelemetryCallback) {
   client = mqtt.connect(MQTT_BROKER, {
     clientId: `robotops-web-${Math.random().toString(16).slice(2, 8)}`,
     clean: true,
-    reconnectPeriod: 3000,
+    reconnectPeriod: 5000,   // 5 秒重连一次（避免频繁重连刷屏）
+    connectTimeout: 10000,   // 10 秒连接超时
+    keepalive: 30,           // 30 秒心跳（mosquitto 默认 60，前端短一些更敏感）
+    resubscribe: true,       // 重连后自动重新订阅
   });
 
   client.on('connect', () => {

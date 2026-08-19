@@ -11,6 +11,8 @@ interface RobotStore {
   setOffline: (id: string) => void
   addRobot: (state: UnifiedRobotState) => void
   removeRobot: (id: string) => void
+  // 定时检查：超过 15 秒未收到消息的机器人标记为离线
+  markOfflineIfStale: () => void
   // 从 Supabase robots 表加载初始机器人列表（登录后调用，离线模式自动跳过）
   initFromSupabase: () => Promise<void>
 }
@@ -52,6 +54,24 @@ export const useRobotStore = create<RobotStore>((set) => ({
     set((s) => {
       const { [id]: _, ...rest } = s.robots
       return { robots: rest, onlineCount: Object.values(rest).filter((r) => r.online).length }
+    }),
+
+  markOfflineIfStale: () =>
+    set((s) => {
+      const now = Date.now()
+      const STALE_MS = 15000 // 15 秒无消息判离线
+      let changed = false
+      const robots = Object.fromEntries(
+        Object.entries(s.robots).map(([id, r]) => {
+          if (r.online && now - r.lastSeen > STALE_MS) {
+            changed = true
+            return [id, { ...r, online: false, status: 'error' as const }]
+          }
+          return [id, r]
+        })
+      )
+      if (!changed) return s
+      return { robots, onlineCount: Object.values(robots).filter((r) => r.online).length }
     }),
 
   initFromSupabase: async () => {

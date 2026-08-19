@@ -24,7 +24,12 @@ interface Props {
 
 export function RobotStatusCard({ state, onClick, compact }: Props) {
   const statusColor = STATUS_COLORS[state.status] ?? 'var(--text-tertiary)'
-  const pct = state.batteryPct
+  const isIndustrial = !!state.industrial
+  // 工业机器人显示关节负载率，商用机器人显示电量
+  const pct = isIndustrial
+    ? state.industrial?.joints?.[0]?.load_pct ?? 0
+    : state.batteryPct
+  const metricLabel = isIndustrial ? '负载' : '电量'
   const segments = 10
 
   return (
@@ -71,7 +76,7 @@ export function RobotStatusCard({ state, onClick, compact }: Props) {
 
       <div className="robot-card__battery">
         <div className="robot-card__battery-label">
-          <span>电量</span>
+          <span>{metricLabel}</span>
           <span style={{ color: pct < 20 ? 'var(--status-error)' : 'var(--text-secondary)' }}>
             {pct}%
           </span>
@@ -80,11 +85,15 @@ export function RobotStatusCard({ state, onClick, compact }: Props) {
           {Array.from({ length: segments }).map((_, i) => {
             const filled = i < Math.round((pct / 100) * segments)
             const segColor =
-              pct < 20
+              pct > 100
                 ? 'var(--status-error)'
-                : pct < 50
-                  ? 'var(--status-working)'
-                  : 'var(--status-online)'
+                : pct > 80
+                  ? 'var(--alert-warn)'
+                  : pct < 20
+                    ? 'var(--status-error)'
+                    : pct < 50
+                      ? 'var(--status-working)'
+                      : 'var(--status-online)'
             return (
               <div
                 key={i}

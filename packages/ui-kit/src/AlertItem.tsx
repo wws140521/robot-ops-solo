@@ -15,9 +15,10 @@ const LEVEL_ICONS: Record<string, string> = {
 interface Props {
   alert: UnifiedAlert
   onDismiss?: (id: string) => void
+  brandColor?: string
 }
 
-export function AlertItem({ alert, onDismiss }: Props) {
+export function AlertItem({ alert, onDismiss, brandColor }: Props) {
   const color = LEVEL_COLORS[alert.level] ?? 'var(--text-tertiary)'
   const time = new Date(alert.timestamp).toLocaleTimeString()
 
@@ -25,7 +26,7 @@ export function AlertItem({ alert, onDismiss }: Props) {
     <div
       className="alert-item"
       style={{
-        borderLeft: `3px solid ${color}`,
+        borderLeft: `3px solid ${brandColor || color}`,
         background: `${color}11`,
       }}
     >

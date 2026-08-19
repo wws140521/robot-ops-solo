@@ -51,13 +51,15 @@ export function adaptYaskawa(
     power_on_hours: raw.runtime?.power_on_hours ?? 0,
     cycle_count: raw.runtime?.cycle_count ?? 0,
     last_maintenance_at: raw.runtime?.last_maintenance_at,
+    payload_kg: raw.runtime?.payload_kg,
   };
 
   const industrial: IndustrialExtension = {
     joints,
     alarms,
     runtime,
-    protocol: 'ETHERNET_YASKAWA',
+    protocol: 'HSE',
+    extensions: raw.extensions,
   };
 
   const state: UnifiedRobotState = {
@@ -67,7 +69,9 @@ export function adaptYaskawa(
     batteryPct: 0,
     voltage: 0,
     online: true,
-    position: { x: 0, y: 0, theta: 0 },
+    position: raw.pose
+      ? { x: raw.pose.x, y: raw.pose.y, theta: (raw.pose.rz ?? 0) * Math.PI / 180 }
+      : { x: 0, y: 0, theta: 0 },
     status: 'working',
     lastSeen: Date.now(),
     industrial,
