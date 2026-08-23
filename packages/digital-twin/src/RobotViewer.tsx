@@ -9,6 +9,7 @@ import { SlamMap } from './environment/SlamMap'
 import { isObstacle, getCellType, type CellType } from './environment/collision'
 import { GlowTrajectory } from './overlays/GlowTrajectory'
 import { StatusBadge } from './overlays/StatusBadge'
+import { useScenePalette } from './hooks/useScenePalette'
 import type { UnifiedRobotState } from 'robot-adapter-kit'
 
 interface RobotViewerProps {
@@ -18,11 +19,8 @@ interface RobotViewerProps {
   showMap?: boolean
 }
 
-const BG_TOP = '#e8eef5'
-const BG_BOTTOM = '#d1dae8'
-const FOG_COLOR = '#dde4f0'
-
 export function RobotViewer({ robotId, state, trajectory, showMap = true }: RobotViewerProps) {
+  const palette = useScenePalette()
   const collision = state ? isObstacle(state.position.x, state.position.y) : false
   const cellType: CellType | null = state ? getCellType(state.position.x, state.position.y) : null
 
@@ -34,7 +32,7 @@ export function RobotViewer({ robotId, state, trajectory, showMap = true }: Robo
         height: '100%',
         borderRadius: 10,
         overflow: 'hidden',
-        background: `linear-gradient(180deg, ${BG_TOP} 0%, ${BG_BOTTOM} 100%)`,
+        background: `linear-gradient(180deg, ${palette.bgTop} 0%, ${palette.bgBottom} 100%)`,
       }}
     >
       {state && <StatusBadge state={state} collision={collision} cellType={cellType} />}
@@ -44,8 +42,8 @@ export function RobotViewer({ robotId, state, trajectory, showMap = true }: Robo
         camera={{ position: [5.5, 4.5, 6.5], fov: 42 }}
         gl={{ antialias: true }}
       >
-        <color attach="background" args={[BG_BOTTOM]} />
-        <fog attach="fog" args={[FOG_COLOR, 14, 32]} />
+        <color attach="background" args={[palette.bgBottom]} />
+        <fog attach="fog" args={[palette.fog, 14, 32]} />
 
         <ambientLight intensity={0.75} color="#ffffff" />
 
@@ -67,29 +65,36 @@ export function RobotViewer({ robotId, state, trajectory, showMap = true }: Robo
         <pointLight
           position={[-5, 3, -3]}
           intensity={0.6}
-          color="#4a9eff"
+          color={palette.accent}
           distance={14}
           decay={2}
         />
         <pointLight
           position={[4, 2, 4]}
           intensity={0.5}
-          color="#7b61ff"
+          color={palette.primary}
           distance={12}
           decay={2}
         />
 
-        <Floor />
-        {showMap && <SlamMap />}
+        <Floor color={palette.floor} />
+        {showMap && (
+          <SlamMap
+            wallPerimColor={palette.wallPerim}
+            wallInnerColor={palette.wallInner}
+            wallPerimEmissive={palette.wallPerimEmissive}
+            wallInnerEmissive={palette.wallInnerEmissive}
+          />
+        )}
 
         <Grid
           args={[28, 28]}
           cellSize={0.5}
           cellThickness={0.5}
-          cellColor="#b8c4d8"
+          cellColor={palette.gridCell}
           sectionSize={2}
           sectionThickness={1}
-          sectionColor="#4a9eff"
+          sectionColor={palette.gridSection}
           fadeDistance={24}
           fadeStrength={1.5}
           infiniteGrid
@@ -102,12 +107,12 @@ export function RobotViewer({ robotId, state, trajectory, showMap = true }: Robo
           blur={2.4}
           far={6}
           resolution={1024}
-          color="#5a6a85"
+          color={palette.shadow}
         />
 
         {state && <RobotBody state={state} collision={collision} />}
-        {trajectory && trajectory.length > 1 && <GlowTrajectory points={trajectory} />}
-        {state && <GroundRing position={[state.position.x, 0, state.position.y]} />}
+        {trajectory && trajectory.length > 1 && <GlowTrajectory points={trajectory} color={palette.accent} />}
+        {state && <GroundRing position={[state.position.x, 0, state.position.y]} color={palette.accent} />}
 
         <OrbitControls
           makeDefault
@@ -151,7 +156,13 @@ function CollisionRing({ position }: { position: [number, number, number] }) {
   )
 }
 
-function GroundRing({ position }: { position: [number, number, number] }) {
+function GroundRing({
+  position,
+  color = '#4a9eff',
+}: {
+  position: [number, number, number]
+  color?: string
+}) {
   const matRef = useRef<THREE.MeshBasicMaterial>(null)
   useFrame((s) => {
     if (matRef.current) {
@@ -161,7 +172,7 @@ function GroundRing({ position }: { position: [number, number, number] }) {
   return (
     <mesh position={[position[0], 0.02, position[2]]} rotation={[-Math.PI / 2, 0, 0]}>
       <ringGeometry args={[0.7, 0.85, 48]} />
-      <meshBasicMaterial ref={matRef} color="#4a9eff" transparent opacity={0.3} side={THREE.DoubleSide} />
+      <meshBasicMaterial ref={matRef} color={color} transparent opacity={0.3} side={THREE.DoubleSide} />
     </mesh>
   )
 }

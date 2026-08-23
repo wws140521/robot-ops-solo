@@ -3,10 +3,23 @@ import { LAYOUT, GRID, GRID_OX, GRID_OZ } from './collision'
 
 interface SlamMapProps {
   data?: number[][] // 0=空 1=障碍
+  wallPerimColor?: string
+  wallInnerColor?: string
+  wallPerimEmissive?: string
+  wallInnerEmissive?: string
 }
 
-// 把栅格障碍渲染成 3D 墙体，像真实场地俯视
-export function SlamMap({ data }: SlamMapProps) {
+/**
+ * 把栅格障碍渲染成 3D 墙体（俯视场地）。
+ * 颜色完全走 CSS 变量派生 → 深浅主题 / 贴牌换肤自动同步。
+ */
+export function SlamMap({
+  data,
+  wallPerimColor = '#2a3e34',
+  wallInnerColor = '#22342c',
+  wallPerimEmissive = '#183a28',
+  wallInnerEmissive = '#193545',
+}: SlamMapProps = {}) {
   const grid = useMemo(() => data ?? LAYOUT, [data])
   const { cellSize, cols, rows } = GRID
   const ox = GRID_OX
@@ -27,10 +40,10 @@ export function SlamMap({ data }: SlamMapProps) {
         >
           <boxGeometry args={[cellSize, h, cellSize]} />
           <meshStandardMaterial
-            color={isPerimeter ? '#8a9ab5' : '#a8b8d0'}
+            color={isPerimeter ? wallPerimColor : wallInnerColor}
             roughness={0.55}
             metalness={0.2}
-            emissive={isPerimeter ? '#c8d4e8' : '#d8e2f0'}
+            emissive={isPerimeter ? wallPerimEmissive : wallInnerEmissive}
             emissiveIntensity={0.15}
           />
         </mesh>,

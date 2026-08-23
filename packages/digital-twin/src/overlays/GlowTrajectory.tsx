@@ -3,9 +3,10 @@ import { Line } from '@react-three/drei'
 
 interface GlowTrajectoryProps {
   points: { x: number; y: number }[]
+  color?: string
 }
 
-export function GlowTrajectory({ points }: GlowTrajectoryProps) {
+export function GlowTrajectory({ points, color = '#4a9eff' }: GlowTrajectoryProps) {
   const pts = useMemo(
     () => points.map((p) => [p.x, 0.08, p.y] as [number, number, number]),
     [points],
@@ -17,7 +18,7 @@ export function GlowTrajectory({ points }: GlowTrajectoryProps) {
     <>
       <Line
         points={pts}
-        color="#4a9eff"
+        color={color}
         lineWidth={4}
         transparent
         opacity={0.2}
@@ -27,7 +28,7 @@ export function GlowTrajectory({ points }: GlowTrajectoryProps) {
       />
       <Line
         points={pts}
-        color="#4a9eff"
+        color={color}
         lineWidth={2}
         transparent
         opacity={0.85}
