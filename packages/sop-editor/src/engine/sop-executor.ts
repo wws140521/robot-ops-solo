@@ -1,5 +1,4 @@
-// SOP 执行引擎 —— 把 SOP Graph JSON 变成实际行为
-// 对应 SOP-HOTPOT.md 第三节 3.1
+// 2026-08-18 实现 SOP 执行引擎，将 Graph JSON 转为实际行为，对应 SOP-HOTPOT 3.1
 import type { SopGraph, SopNode, SopEdge } from '../schema/sop-schema'
 
 export interface ExecutorContext {
@@ -8,7 +7,7 @@ export interface ExecutorContext {
   currentPosition: { x: number; y: number }
   trayWeight: number
   now: () => Date
-  // 外部注入的能力（不耦合具体实现）
+  // 2026-08-18 依赖注入解耦执行器与具体能力实现，便于模拟器和真机各自提供
   moveTo: (target: string, speed: number) => Promise<void>
   speak: (text: string, volume: number) => Promise<void>
   wait: (seconds: number) => Promise<void>
@@ -26,7 +25,7 @@ export class SopExecutor {
   constructor(
     private graph: SopGraph,
     private ctx: ExecutorContext,
-    // 节点进入回调：用于把 "[SOP] ▶ 节点名 (type)" 转发到 UI 日志面板
+    // 2026-08-18 节点进入回调，转发到 UI 日志面板（验证清单要求看到节点名）
     private onNodeEnter?: (node: SopNode) => void
   ) {
     graph.nodes.forEach((n) => this.nodeMap.set(n.id, n))
@@ -51,13 +50,13 @@ export class SopExecutor {
 
       const label = (node.data as { label?: string }).label ?? node.id
       console.log(`[SOP] ▶ ${label} (${node.type})`)
-      // 转发到 UI 日志面板（验证清单第 2/3/4… 条要求看到节点名）
+      // 2026-08-18 转发到 UI 日志面板，验证清单第 2/3/4 条要求可见节点名
       this.onNodeEnter?.(node)
       await this.executeNode(node)
 
       if (!this.running) break // 节点可能已 stop 或 shutdown
 
-      // 找下一个节点（条件/循环节点可能已在 executeNode 内直接设定 currentNodeId）
+      // 2026-08-18 条件/循环节点可能在 executeNode 内直接设定 currentNodeId，跳过 findNext
       if (this.currentNodeId === node.id) {
         const next = this.findNextNode(node)
         this.currentNodeId = next
@@ -76,7 +75,8 @@ export class SopExecutor {
 
   private async executeNode(node: SopNode) {
     const { type } = node
-    // 节点 data 是联合类型，引擎按 JSON 语义宽松访问
+    // 2026-08-19 联合类型宽松访问，兼容简版和完整版 SOP schema
+    // TODO: 后续加严格类型守卫替代 JSON 宽松访问
     const data = node.data as any
 
     switch (type) {
@@ -118,7 +118,7 @@ export class SopExecutor {
         break
 
       case 'loop': {
-        // 时间范围循环：不在范围内则跳到 onComplete
+        // 2026-08-18 时间范围循环，不在范围内则跳到 onComplete
         if (data.startTime && data.endTime) {
           const now = this.ctx.now()
           const start = this.parseTime(data.startTime, now)
@@ -151,7 +151,7 @@ export class SopExecutor {
   private findNextNode(node: SopNode): string | null {
     const edges = this.edgeMap.get(node.id) ?? []
     if (edges.length === 0) return null
-    // 优先选无 label 的（默认边），其次按条件选
+    // 2026-08-18 优先选无 label 的默认边，其次按条件选
     const defaultEdge = edges.find((e) => !e.label)
     return (defaultEdge ?? edges[0]).target
   }

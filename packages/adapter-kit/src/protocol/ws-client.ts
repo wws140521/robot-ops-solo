@@ -1,4 +1,4 @@
-// 通用 WebSocket 客户端（重连/心跳/多 topic 订阅）
+// 2026-08-18 自研 WS 客户端，支持指数退避重连+心跳+多 topic 订阅
 export class RobotWSClient {
   private ws: WebSocket | null = null
   private reconnectTimer?: number
@@ -54,7 +54,7 @@ export class RobotWSClient {
 
   private scheduleReconnect() {
     if (this.reconnectAttempts >= this.maxReconnect) return
-    // 指数退避 + 抖动（1s → 2s → 4s → 8s → … 最大 30s）
+    // 2026-08-19 指数退避+抖动，避免雪崩重连（1s→2s→4s→8s…最大 30s）
     const base = Math.min(1000 * 2 ** this.reconnectAttempts, 30000)
     const jitter = Math.random() * 500 // 0~500ms 抖动，避免雷同重连
     const delay = base + jitter

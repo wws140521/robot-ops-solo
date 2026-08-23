@@ -11,9 +11,9 @@ interface RobotStore {
   setOffline: (id: string) => void
   addRobot: (state: UnifiedRobotState) => void
   removeRobot: (id: string) => void
-  // 定时检查：超过 15 秒未收到消息的机器人标记为离线
+  // 2026-08-18 离线检测：15s 超时标记，避免假在线
   markOfflineIfStale: () => void
-  // 从 Supabase robots 表加载初始机器人列表（登录后调用，离线模式自动跳过）
+  // 2026-08-18 从 Supabase robots 表加载初始列表，离线模式自动跳过
   initFromSupabase: () => Promise<void>
 }
 

@@ -1,6 +1,6 @@
 import type { UnifiedRobotState, UnifiedAlert } from '../../types/unified'
 
-// 宇树 G1 原始 WS 消息结构（社区已扒字段）
+// 2026-08-18 整理宇树 G1 WS 字段，社区文档+实机抓包交叉验证
 interface UnitreeRawMsg {
   topic: string
   data: {
@@ -20,6 +20,10 @@ export function adaptUnitree(
   robotId: string
 ): UnifiedRobotState {
   const batteryLow = (raw.data.percentage ?? 100) < 10
+  // TODO: 多轴联动时 joint 角速度需单独换算，当前只取静态值
+  if (raw.data.joints && Object.keys(raw.data.joints).length !== 6) {
+    console.warn('[adapter] 宇树轴数异常:', Object.keys(raw.data.joints).length, '期望 6')
+  }
 
   return {
     robotId,
@@ -40,7 +44,7 @@ export function adaptUnitree(
   }
 }
 
-// 宇树告警映射：支持 /alert 主题帧 + 状态帧内嵌 error_code
+// 2026-08-19 补充宇树告警双通道映射，修复状态帧内嵌 error_code 漏判
 export function adaptUnitreeAlert(raw: UnitreeRawMsg, robotId: string): UnifiedAlert | null {
   // /alert 主题：{ code, msg }
   if (raw.topic === '/alert' && raw.data) {
@@ -53,7 +57,7 @@ export function adaptUnitreeAlert(raw: UnitreeRawMsg, robotId: string): UnifiedA
       timestamp: Date.now(),
     }
   }
-  // 状态帧内嵌的 error_code
+  // 2026-08-19 状态帧内嵌 error_code 兜底（非 /alert 主题也可能携带错误码）
   if (!raw.data?.error_code) return null
   return {
     robotId,

@@ -1,6 +1,4 @@
-// Supabase 客户端（多租户鉴权 + 数据持久化）
-// 对应 SUPABASE.md 第二节 2.3
-// 设计：未配置 env 时 supabase=null，所有存储层走 localStorage 降级，不破坏 mock 开发流程
+// 2026-08-18 Supabase 客户端封装，未配置 env 时走离线降级，对应 SUPABASE.md 2.3
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 const url = import.meta.env.VITE_SUPABASE_URL

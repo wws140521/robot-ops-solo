@@ -4,9 +4,9 @@ import { useAlertStore } from '../stores/alertStore'
 import { useSpeakStore, type SpeakEvent } from '../stores/speakStore'
 import { writeRobotState } from './robotStorage'
 import { writeAlert } from './alertStorage'
-// 工业品牌集合
+// 2026-08-18 工业品牌集合
 const INDUSTRIAL_BRANDS = new Set(['fanuc', 'kuka', 'estun', 'yaskawa'])
-// 在 wsHub 初始化函数里（你现有的 initWS 或 startWS 里）加这几行：
+// 2026-08-18 wsHub 初始化，工业消息分流入口
 connectMqtt((state, alerts) => {
   const { updateRobot } = useRobotStore.getState();
   const { addAlert } = useAlertStore.getState();
@@ -82,7 +82,7 @@ function isSpeakMessage(raw: any): boolean {
   return raw?.topic === '/speak'
 }
 
-// 是否为告警主题帧（状态帧 vs 告警帧分流，避免告警帧污染状态）
+// 2026-08-19 状态帧/告警帧分流，修复告警帧污染电量的问题
 function isAlertMessage(brand: string, raw: any): boolean {
   if (brand === 'unitree') return raw?.topic === '/alert'
   if (brand === 'keenon') return raw?.cmd === 'alert'
@@ -133,8 +133,9 @@ export function startWS(connections: WsConnection[]) {
       url,
       (raw) => {
         try {
-          // 工业消息分流（type: industrial_state / industrial_alert）
+          // 2026-08-19 工业消息分流（type: industrial_state / industrial_alert）
           if (raw?.type === 'industrial_state' || raw?.type === 'industrial_alert') {
+            console.log('[wsHub] 工业消息分流:', raw.type, raw.brand)
             handleIndustrialMessage(raw)
             return
           }

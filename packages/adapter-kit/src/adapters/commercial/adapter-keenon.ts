@@ -1,6 +1,6 @@
 import type { UnifiedRobotState, UnifiedAlert } from '../../types/unified'
 
-// 擎朗 Peanut 原始消息结构（MQTT topic: pudu/robot/state）
+// 2026-08-18 对接擎朗 Peanut MQTT 协议，topic=pudu/robot/state
 interface KeenonRawMsg {
   cmd: string
   payload: {

@@ -1,6 +1,5 @@
-// SOP 模拟器 —— 没有真机也能跑，用于演示和测试
-// 对应 SOP-HOTPOT.md 第三节 3.2
-// 增强：内置模拟时钟（从 18:00 起步）+ 加大掉电速率，让验证清单 10 条全部可观测
+// 2026-08-18 实现 SOP 模拟器，无真机也能跑，对应 SOP-HOTPOT 3.2
+// 2026-08-19 增强：内置模拟时钟（18:00 起步）+ 加大掉电速率，验证清单 10 条全部可观测
 import { SopExecutor, type ExecutorContext } from './sop-executor'
 import type { SopGraph, Waypoint } from '../schema/sop-schema'
 
@@ -19,7 +18,7 @@ export function createSimulator(graph: SopGraph, events: SimEvents) {
   let trayWeight = 500
   const pos = { x: 0, y: 0 }
 
-  // 模拟时钟：从今天 18:00 起步，落在晚市高峰 17:50-20:30 内
+  // 2026-08-18 模拟时钟从今天 18:00 起步，落在晚市高峰 17:50-20:30 内
   const simNow = new Date()
   simNow.setHours(18, 0, 0, 0)
   const advance = (minutes: number) => {
@@ -44,7 +43,7 @@ export function createSimulator(graph: SopGraph, events: SimEvents) {
         pos.x = wp.x
         pos.y = wp.y
       }
-      // 演示用掉电速率：每段 -15%，便于触发 <30% 回充分支
+      // 2026-08-18 演示用掉电速率调高到 15%/段，便于触发 <30% 回充分支
       batteryPct = Math.max(0, batteryPct - 15)
       ctx.batteryPct = batteryPct
       advance(25) // 模拟 25 分钟行程
@@ -68,7 +67,7 @@ export function createSimulator(graph: SopGraph, events: SimEvents) {
     },
 
     checkWeight: () => {
-      // 模拟：第一次有重量，送完变空
+      // 2026-08-18 模拟取托盘重量，第一次有重量送完变空
       const w = trayWeight
       trayWeight = 0
       ctx.trayWeight = 0

@@ -8,7 +8,7 @@ import { adaptKeenon, adaptKeenonAlert } from './adapter-keenon'
 import { adaptAgibot, adaptAgibotAlert } from './adapter-agibot'
 import { adaptPudutech, adaptPudutechAlert } from './adapter-pudutech'
 
-// 未知品牌降级：返回一个安全的 mock 状态（不 throw）
+// 2026-08-19 未知品牌降级策略，返回安全 mock 避免运行时崩溃
 function fallbackState(brand: string, raw: any, robotId: string): UnifiedRobotState {
   console.warn(`[adapter-kit] 品牌 "${brand}" 未注册，使用 fallback mock state`)
   return {
@@ -38,7 +38,7 @@ function fallbackAlert(brand: string, raw: any, robotId: string): UnifiedAlert |
   return null
 }
 
-// 工厂：根据 brand 分发到对应 adapter（未注册品牌走 fallback mock，不 throw）
+// 2026-08-18 品牌工厂分发逻辑，未注册品牌走 fallback 不 throw
 export function adaptIncoming(
   brand: string,
   raw: any,

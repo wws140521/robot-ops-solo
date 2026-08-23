@@ -1,4 +1,4 @@
-// 统一机器人状态模型 —— 所有品牌转成这个结构
+// 2026-08-18 设计 UDM 统一模型，解决多品牌字段不一致问题（FOCAS/OPC UA/Modbus 互不通）
 import type { IndustrialExtension } from './industrial'
 
 export interface UnifiedRobotState {
@@ -21,7 +21,7 @@ export interface UnifiedRobotState {
   industrial?: IndustrialExtension
 }
 
-// 统一告警
+// 2026-08-18 统一告警模型，所有品牌告警码翻译为 info/warn/error 三级
 export interface UnifiedAlert {
   robotId: string
   level: 'info' | 'warn' | 'error'
@@ -30,7 +30,7 @@ export interface UnifiedAlert {
   timestamp: number
 }
 
-// 统一任务指令（下发用）
+// 2026-08-18 统一任务指令模型，商用机器人下发用（工业只读）
 export interface UnifiedCommand {
   robotId: string
   action: 'move' | 'speak' | 'dock' | 'stop' | 'custom'

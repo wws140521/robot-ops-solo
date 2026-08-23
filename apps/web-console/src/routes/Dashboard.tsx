@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { useRobotStore } from '../stores/robotStore'
 import { useAlertStore } from '../stores/alertStore'
 import { useThemeStore } from '../stores/themeStore'
-import { RobotStatusCard, BatteryGauge, AlertItem } from 'ui-kit'
+import { RobotStatusCard, BatteryGauge, AlertItem, GlassCard, StatusDot, NeonBadge, TaskTimeline, HealthGauge, type TimelineItem } from 'ui-kit'
 import type { UnifiedRobotState } from 'robot-adapter-kit'
-import { Download, Plus, Bot, BatteryCharging, Bell, LayoutGrid, CheckCircle2, X, Factory } from 'lucide-react'
-import { RobotCards } from '../components/RobotCards'
+import { Download, Plus, Bot, BatteryCharging, Bell, LayoutGrid, CheckCircle2, X } from 'lucide-react'
 import { getBrandConfig } from '../lib/brandRegistry'
 
 export function Dashboard() {
@@ -65,8 +64,40 @@ export function Dashboard() {
     setShowAdd(false)
   }
 
+  // 2026-08-18 初版健康分：电量*0.6+在线*20+无错误*20
+  // TODO: 加入温度衰减系数，高温环境电池权重从 0.3 降到 0.15
+  const calcHealth = (r: UnifiedRobotState): number => {
+    let score = r.batteryPct * 0.6
+    if (r.online) score += 20
+    if (!r.errorCode) score += 20
+    if (r.status === 'error') score = Math.max(20, score - 30)
+    const result = Math.min(100, Math.round(score))
+    console.log('[health] 健康分计算:', { robotId: r.robotId, battery: r.batteryPct, online: r.online, score: result })
+    return result
+  }
+
+  // 生成时间轴数据（告警 + 机器人状态变化）
+  const timelineItems: TimelineItem[] = alerts.slice(0, 5).map((a) => ({
+    time: new Date(a.timestamp).toLocaleTimeString().slice(0, 5),
+    title: `${a.robotId} · ${a.message}`,
+    status: a.level === 'error' ? 'error' : a.level === 'warn' ? 'warn' : 'doing',
+    desc: `[${a.code}] ${a.robotId} 告警`,
+  }))
+
+  // 如果时间轴为空，显示最近机器人活动
+  if (timelineItems.length === 0) {
+    timelineItems.push(
+      ...robotList.slice(0, 3).map((r, i) => ({
+        time: `${(new Date().getHours() - i).toString().padStart(2, '0')}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`,
+        title: `${r.robotId} · 状态同步完成`,
+        status: 'done' as const,
+        desc: r.online ? `${r.brand} ${r.model} · 运行正常` : `设备离线，最后活动时间: ${new Date(r.lastSeen).toLocaleTimeString()}`,
+      }))
+    )
+  }
+
   return (
-    <div style={{ animation: 'fadeInUp 0.4s var(--ease-out)' }}>
+    <div style={{ animation: 'ng-fade-in-up 0.16s ease-out' }}>
       <div className="page-header">
         <h1 className="page-title">运维总览</h1>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -76,13 +107,11 @@ export function Dashboard() {
       </div>
 
       {showAdd && (
-        <div
-          className="card hud-corners"
+        <GlassCard
+          highlight
           style={{
             marginBottom: 16,
             padding: 20,
-            border: '1px solid var(--border-hover)',
-            boxShadow: 'var(--glow-primary)',
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
@@ -137,9 +166,10 @@ export function Dashboard() {
               确认添加
             </button>
           </div>
-        </div>
+        </GlassCard>
       )}
 
+      {/* KPI 统计卡片 —— 使用 Neon Glass 风格 */}
       <div className="grid grid-4" style={{ marginBottom: 20 }}>
         <KpiCard
           label="在线机器人"
@@ -154,7 +184,7 @@ export function Dashboard() {
         <KpiCard
           label="平均电量"
           value={`${avgPower}%`}
-          color="var(--primary)"
+          color="var(--neon)"
           trend={avgPower > 50 ? '+5%' : '-3%'}
           trendUp={avgPower > 50}
           icon={<BatteryCharging size={20} />}
@@ -163,7 +193,7 @@ export function Dashboard() {
         <KpiCard
           label="活跃告警"
           value={alerts.length}
-          color="var(--alert-error)"
+          color="var(--status-error)"
           trend={alerts.length > 0 ? `${alerts.length} 新增` : '0 新增'}
           trendUp={alerts.length === 0}
           icon={<Bell size={20} />}
@@ -182,7 +212,8 @@ export function Dashboard() {
       </div>
 
       <div className="grid grid-2">
-        <div className="card hud-corners">
+        {/* 机器人状态卡片墙 —— Neon Glass 层叠卡 */}
+        <GlassCard>
           <div
             style={{
               display: 'flex',
@@ -191,13 +222,20 @@ export function Dashboard() {
               marginBottom: 14,
             }}
           >
-            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+            <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{
+                width: 4,
+                height: 14,
+                background: 'linear-gradient(180deg, var(--neon), var(--accent))',
+                borderRadius: 2,
+                boxShadow: 'var(--neon-glow)',
+              }} />
               机器人状态
             </div>
             <span
               style={{
                 fontSize: 11,
-                color: 'var(--text-tertiary)',
+                color: 'var(--text-muted)',
                 fontFamily: 'var(--font-mono)',
               }}
             >
@@ -207,7 +245,7 @@ export function Dashboard() {
           {robotList.length === 0 && (
             <div
               style={{
-                color: 'var(--text-tertiary)',
+                color: 'var(--text-muted)',
                 fontSize: 13,
                 textAlign: 'center',
                 padding: 28,
@@ -216,14 +254,62 @@ export function Dashboard() {
               暂无机器人数据<br />请检查 WS 连接或添加机器人
             </div>
           )}
-          {robotList.map((r) => (
-            <div key={r.robotId} style={{ marginBottom: 8 }}>
-              <RobotStatusCard state={r} />
-            </div>
-          ))}
-        </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {robotList.map((r) => {
+              const brandCfg = getBrandConfig(r.brand)
+              const health = calcHealth(r)
+              return (
+                <div
+                  key={r.robotId}
+                  onClick={() => navigate(`/robots/${r.robotId}`)}
+                  style={{
+                    position: 'relative',
+                    padding: 14,
+                    background: 'var(--bg-elev-1)',
+                    border: '1px solid var(--border-base)',
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--border-strong)'
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = 'var(--shadow-pop)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--border-base)'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <NeonBadge brand={r.brand}>{r.robotId}</NeonBadge>
+                        <StatusDot status={r.online ? (r.status === 'error' ? 'error' : 'online') : 'offline'} />
+                        <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                          {r.status === 'idle' ? '空闲' : r.status === 'moving' ? '移动中' : r.status === 'working' ? '工作中' : r.status === 'error' ? '故障' : '充电中'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+                        {r.brand} · {r.model}
+                        {r.errorCode && (
+                          <span style={{ color: 'var(--status-error)', marginLeft: 8 }}>
+                            · 错误码: {r.errorCode}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <HealthGauge value={health} size={64} label="健康" />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </GlassCard>
 
-        <div className="card hud-corners">
+        {/* 时间轴 + 告警流 —— TaskTimeline */}
+        <GlassCard>
           <div
             style={{
               display: 'flex',
@@ -232,23 +318,55 @@ export function Dashboard() {
               marginBottom: 14,
             }}
           >
-            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-              告警流
+            <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{
+                width: 4,
+                height: 14,
+                background: 'linear-gradient(180deg, var(--neon), var(--accent))',
+                borderRadius: 2,
+                boxShadow: 'var(--neon-glow)',
+              }} />
+              近期告警 / 任务
             </div>
             <span
               style={{
                 fontSize: 11,
-                color: 'var(--text-tertiary)',
+                color: 'var(--text-muted)',
                 fontFamily: 'var(--font-mono)',
               }}
             >
-              {alerts.length} ALERTS
+              TIMELINE
             </span>
           </div>
-          {alerts.length === 0 ? (
+
+          {alerts.length > 0 && (
+            <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid var(--border-subtle)' }}>
+              {alerts.slice(0, 3).map((a, i) => {
+                const robot = robots[a.robotId]
+                const brandCfg = getBrandConfig(robot?.brand || '')
+                return (
+                  <div
+                    key={i}
+                    onClick={() => navigate(`/robots/${a.robotId}`)}
+                    style={{
+                      cursor: 'pointer',
+                      opacity: 1,
+                      transition: 'opacity 0.15s',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
+                    onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+                  >
+                    <AlertItem alert={a} onDismiss={clearAlerts} brandColor={brandCfg.color} />
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {timelineItems.length === 0 ? (
             <div
               style={{
-                color: 'var(--text-tertiary)',
+                color: 'var(--text-muted)',
                 fontSize: 13,
                 textAlign: 'center',
                 padding: 28,
@@ -257,26 +375,9 @@ export function Dashboard() {
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><CheckCircle2 size={16} /> 无告警，一切正常</span>
             </div>
           ) : (
-            alerts.slice(0, 10).map((a, i) => {
-              const robot = robots[a.robotId]
-              const brandCfg = getBrandConfig(robot?.brand || '')
-              return (
-                <div
-                  key={i}
-                  onClick={() => navigate(`/robots/${a.robotId}`)}
-                  style={{
-                    cursor: 'pointer',
-                    transition: 'opacity 0.15s',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
-                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
-                >
-                  <AlertItem alert={a} onDismiss={clearAlerts} brandColor={brandCfg.color} />
-                </div>
-              )
-            })
+            <TaskTimeline items={timelineItems} />
           )}
-        </div>
+        </GlassCard>
       </div>
     </div>
   )
@@ -309,12 +410,11 @@ function KpiCard({
   const isLight = themeMode === 'light'
 
   return (
-    <div
-      className="card hud-corners"
+    <GlassCard
       style={{
         padding: 18,
         position: 'relative',
-        animation: blink ? 'pulse-dot 2s ease infinite' : undefined,
+        animation: blink ? 'ng-soft-pulse 2s ease infinite' : undefined,
       }}
     >
       {/* KPI 卡顶部色条 */}
@@ -339,7 +439,7 @@ function KpiCard({
         <span
           style={{
             fontSize: 11,
-            color: 'var(--text-tertiary)',
+            color: 'var(--text-muted)',
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
           }}
@@ -350,7 +450,7 @@ function KpiCard({
           style={{
             fontSize: 11,
             fontWeight: 600,
-            color: trendUp ? 'var(--status-online)' : 'var(--alert-error)',
+            color: trendUp ? 'var(--status-online)' : 'var(--status-error)',
             fontFamily: 'var(--font-mono)',
           }}
         >
@@ -383,7 +483,7 @@ function KpiCard({
             <span
               style={{
                 fontSize: 13,
-                color: 'var(--text-tertiary)',
+                color: 'var(--text-muted)',
                 marginLeft: 4,
                 fontFamily: 'var(--font-mono)',
               }}
@@ -414,7 +514,7 @@ function KpiCard({
           background: `linear-gradient(90deg, transparent, ${color}44, transparent)`,
         }}
       />
-    </div>
+    </GlassCard>
   )
 }
 
