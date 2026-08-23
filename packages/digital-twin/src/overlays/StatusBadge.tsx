@@ -8,11 +8,11 @@ interface StatusBadgeProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  idle: '#52c41a',
-  moving: '#1890ff',
-  working: '#fa8c16',
-  error: '#f5222d',
-  charging: '#722ed1',
+  idle: 'var(--status-online)',
+  moving: 'var(--status-moving)',
+  working: 'var(--status-working)',
+  error: 'var(--status-error)',
+  charging: 'var(--status-charging)',
 }
 
 const CELL_LABEL: Record<CellType, string> = {
@@ -23,7 +23,7 @@ const CELL_LABEL: Record<CellType, string> = {
 }
 
 export function StatusBadge({ state, collision = false, cellType = null }: StatusBadgeProps) {
-  const color = collision ? '#ff1744' : STATUS_COLORS[state.status] ?? '#999'
+  const color = collision ? 'var(--status-error)' : STATUS_COLORS[state.status] ?? 'var(--status-offline)'
   return (
     <div
       style={{
@@ -34,20 +34,20 @@ export function StatusBadge({ state, collision = false, cellType = null }: Statu
         display: 'flex',
         alignItems: 'center',
         gap: 10,
-        background: 'rgba(255,255,255,0.82)',
+        background: 'var(--bg-glass)',
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)',
-        color: '#1e293b',
+        color: 'var(--text-primary)',
         padding: '8px 14px',
         borderRadius: 8,
         fontSize: 13,
         whiteSpace: 'nowrap',
-        border: collision ? '1px solid #ff1744' : '1px solid rgba(0,0,0,0.08)',
+        border: collision ? '1px solid var(--status-error)' : '1px solid var(--border-base)',
         boxShadow: collision
-          ? '0 0 18px rgba(255,23,68,0.35), 0 4px 16px rgba(0,0,0,0.12)'
-          : '0 4px 16px rgba(0,0,0,0.12)',
+          ? 'var(--glow-error), var(--shadow-card)'
+          : 'var(--shadow-card)',
         pointerEvents: 'none',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
+        fontFamily: 'var(--font-sans)',
       }}
     >
       <span
@@ -69,7 +69,7 @@ export function StatusBadge({ state, collision = false, cellType = null }: Statu
         {collision && cellType && (
           <>
             <span style={{ opacity: 0.45, margin: '0 6px' }}>·</span>
-            <span style={{ color: '#ff5a6e', fontWeight: 700 }}>⚠ 穿模 · {CELL_LABEL[cellType]}</span>
+            <span style={{ color: 'var(--status-error)', fontWeight: 700 }}>⚠ 穿模 · {CELL_LABEL[cellType]}</span>
           </>
         )}
       </span>

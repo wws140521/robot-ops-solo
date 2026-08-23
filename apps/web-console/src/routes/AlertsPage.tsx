@@ -2,6 +2,7 @@ import { useAlertStore } from '../stores/alertStore'
 import { useSpeakStore } from '../stores/speakStore'
 import { useState, useMemo } from 'react'
 import { AlertOctagon, AlertTriangle, Info, CheckCheck, Trash2, RadioTower } from 'lucide-react'
+import { GlassCard, TaskTimeline, type TimelineItem, StatusDot } from 'ui-kit'
 import './AlertsPage.css'
 
 type FilterLevel = 'all' | 'error' | 'warn' | 'info'
@@ -53,6 +54,20 @@ export function AlertsPage() {
     info: alerts.filter((a) => a.level === 'info').length,
   }), [alerts])
 
+  // 生成时间轴数据
+  const timelineItems: TimelineItem[] = filteredAlerts.map((a) => {
+    const industrial = parseIndustrialAlert(a.message)
+    return {
+      time: new Date(a.timestamp).toLocaleTimeString(),
+      title: `${a.robotId} · ${industrial ? industrial.zhDesc : a.message}`,
+      status: a.level === 'error' ? 'error' : a.level === 'warn' ? 'warn' : 'doing',
+      desc: industrial
+        ? `[${industrial.rawCode}] ${a.code}`
+        : `[${a.code}] ${a.robotId}`,
+      icon: a.level === 'error' ? <AlertOctagon size={14} /> : a.level === 'warn' ? <AlertTriangle size={14} /> : <Info size={14} />,
+    }
+  })
+
   return (
     <div className="alerts-page">
       <div className="alerts-header">
@@ -99,8 +114,38 @@ export function AlertsPage() {
         ))}
       </div>
 
-      <div className="alerts-list">
-        {filteredAlerts.length === 0 ? (
+      {/* 告警时间轴 —— Neon Glass TaskTimeline 风格 */}
+      <GlassCard style={{ padding: 20 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 16,
+          }}
+        >
+          <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{
+              width: 4,
+              height: 14,
+              background: 'linear-gradient(180deg, var(--neon), var(--accent))',
+              borderRadius: 2,
+              boxShadow: 'var(--neon-glow)',
+            }} />
+            告警列表
+          </div>
+          <span
+            style={{
+              fontSize: 11,
+              color: 'var(--text-muted)',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            {filteredAlerts.length} RECORDS
+          </span>
+        </div>
+
+        {timelineItems.length === 0 ? (
           <div className="alerts-empty">
             <div className="alerts-empty-icon"><RadioTower size={16} /></div>
             <div className="alerts-empty-text">
@@ -108,75 +153,74 @@ export function AlertsPage() {
             </div>
           </div>
         ) : (
-          filteredAlerts.map((alert) => {
-            const isRead = readIds.has(alert.timestamp)
-            const industrial = parseIndustrialAlert(alert.message)
-            return (
-              <div
-                key={`${alert.timestamp}-${alert.robotId}`}
-                className={`alerts-card alerts-card-${alert.level} ${!isRead ? 'alerts-card-unread' : ''}`}
-                onClick={() => {
-                  if (!isRead) {
-                    setReadIds((prev) => new Set(prev).add(alert.timestamp))
-                  }
-                }}
-              >
-                <div className="alerts-card-level-bar" />
-                <div className="alerts-card-body">
-                  <div className="alerts-card-header">
-                    <div className="alerts-card-meta">
-                      <span className="alerts-card-level-icon">
-                        {alert.level === 'error' && <AlertOctagon size={14} />}
-                        {alert.level === 'warn' && <AlertTriangle size={14} />}
-                        {alert.level === 'info' && <Info size={14} />}
-                      </span>
-                      <span className="alerts-card-robot">{alert.robotId}</span>
-                      <span className="alerts-card-code">[{alert.code}]</span>
+          <div style={{ maxHeight: 'calc(100vh - 420px)', overflowY: 'auto', paddingRight: 8 }}>
+            {filteredAlerts.map((alert) => {
+              const isRead = readIds.has(alert.timestamp)
+              const industrial = parseIndustrialAlert(alert.message)
+              return (
+                <div
+                  key={`${alert.timestamp}-${alert.robotId}`}
+                  className={`alerts-card alerts-card-${alert.level} ${!isRead ? 'alerts-card-unread' : ''}`}
+                  onClick={() => {
+                    if (!isRead) {
+                      setReadIds((prev) => new Set(prev).add(alert.timestamp))
+                    }
+                  }}
+                >
+                  <div className="alerts-card-level-bar" />
+                  <div className="alerts-card-body">
+                    <div className="alerts-card-header">
+                      <div className="alerts-card-meta">
+                        <StatusDot
+                          status={alert.level === 'error' ? 'error' : alert.level === 'warn' ? 'warn' : 'online'}
+                        />
+                        <span className="alerts-card-robot">{alert.robotId}</span>
+                        <span className="alerts-card-code">[{alert.code}]</span>
+                      </div>
+                      <div className="alerts-card-time">
+                        {new Date(alert.timestamp).toLocaleTimeString()}
+                      </div>
                     </div>
-                    <div className="alerts-card-time">
-                      {new Date(alert.timestamp).toLocaleTimeString()}
-                    </div>
+                    {industrial ? (
+                      <div className="alerts-card-message">
+                        <span
+                          className="alerts-card-raw-code"
+                          style={{
+                            display: 'inline-block',
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: alert.level === 'error' ? 'var(--status-error)' : alert.level === 'warn' ? 'var(--alert-warn)' : 'var(--alert-info)',
+                            padding: '1px 6px',
+                            borderRadius: 'var(--radius-sm)',
+                            border: `1px solid ${alert.level === 'error' ? 'var(--status-error)' : alert.level === 'warn' ? 'var(--alert-warn)' : 'var(--alert-info)'}`,
+                            marginRight: 6,
+                          }}
+                        >
+                          {industrial.rawCode}
+                        </span>
+                        <span className="alerts-card-zh-desc">{industrial.zhDesc}</span>
+                      </div>
+                    ) : (
+                      <div className="alerts-card-message">{alert.message}</div>
+                    )}
                   </div>
-                  {industrial ? (
-                    <div className="alerts-card-message">
-                      <span
-                        className="alerts-card-raw-code"
-                        style={{
-                          display: 'inline-block',
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: alert.level === 'error' ? 'var(--status-error)' : alert.level === 'warn' ? 'var(--alert-warn)' : 'var(--alert-info)',
-                          background: alert.level === 'error' ? 'var(--status-error)' : alert.level === 'warn' ? 'var(--alert-warn)' : 'var(--alert-info)',
-                          // 用半透明背景：color + '22' 不适用于 var()，改用 padding+border
-                          padding: '1px 6px',
-                          borderRadius: 'var(--radius-sm)',
-                          border: `1px solid ${alert.level === 'error' ? 'var(--status-error)' : alert.level === 'warn' ? 'var(--alert-warn)' : 'var(--alert-info)'}`,
-                          marginRight: 6,
-                        }}
-                      >
-                        {industrial.rawCode}
-                      </span>
-                      <span className="alerts-card-zh-desc">{industrial.zhDesc}</span>
-                    </div>
-                  ) : (
-                    <div className="alerts-card-message">{alert.message}</div>
-                  )}
                 </div>
-              </div>
-            )
-          })
+              )
+            })}
+          </div>
         )}
-      </div>
+      </GlassCard>
 
       {speakHistory.length > 0 && (
-        <div className="card hud-corners alerts-speak-section">
+        <GlassCard style={{ padding: 18 }}>
           <div className="alerts-speak-header">
             <span style={{
               width: 4,
               height: 14,
-              background: 'linear-gradient(180deg, var(--accent), var(--primary))',
+              background: 'linear-gradient(180deg, var(--accent), var(--neon))',
               borderRadius: 2,
+              boxShadow: 'var(--glow-primary)',
             }} />
             <span className="alerts-speak-title">🔊 播报历史</span>
             <span className="alerts-speak-count">({speakHistory.length})</span>
@@ -198,7 +242,7 @@ export function AlertsPage() {
                 </div>
               ))}
           </div>
-        </div>
+        </GlassCard>
       )}
     </div>
   )

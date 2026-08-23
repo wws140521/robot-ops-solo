@@ -3,51 +3,68 @@
    ============================================================ */
 
 :root {
-  /* ── 背景层级（从深到浅，适度提亮）── */
-  --bg-base:      #141b2d;
-  --bg-elev-1:    #1c2540;
-  --bg-elev-2:    #243056;
-  --bg-elev-3:    #2e3d6b;
-  --bg-glass:     rgba(28, 37, 64, 0.70);
+  /* ── Neon Glass · 背景（仅 3 层，近黑带极淡绿）── */
+  --bg-base:      #0a0f0c;
+  --bg-elev-1:    #101613;
+  --bg-elev-2:    #161d18;
+  --bg-elev-3:    #1d2620;
+  --bg-glass:     rgba(16, 22, 19, 0.72);
 
   /* ── 边框 ── */
-  --border-subtle: rgba(255,255,255,0.08);
-  --border-base:   rgba(255,255,255,0.12);
-  --border-hover:  rgba(0, 240, 255, 0.35);
-  --border-focus:  rgba(0, 240, 255, 0.60);
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-base:   rgba(255,255,255,0.08);
+  --border-hover:  rgba(57, 255, 139, 0.35);
+  --border-focus:  rgba(57, 255, 139, 0.60);
+  --border-strong: rgba(57, 255, 139, 0.35);
 
   /* ── 文字 ── */
-  --text-primary:   #f1f5f9;
-  --text-secondary: #b0c0d8;
-  --text-tertiary:  #8295b5;
-  --text-disabled:  #5a6a85;
+  --text-primary:   #e6f2ea;
+  --text-secondary: #a8b8ae;
+  --text-tertiary:  #6f7d74;
+  --text-disabled:  #536059;
+  --text-muted:     #64748b;
 
-  /* ── 品牌色 ── */
-  --primary:        #00f0ff;
-  --primary-dim:    rgba(0, 240, 255, 0.15);
-  --primary-glow:   rgba(0, 240, 255, 0.45);
-  --accent:         #7b61ff;
-  --accent-dim:     rgba(123, 97, 255, 0.15);
+  /* ── 品牌色（霓虹绿为主）── */
+  --primary:        #39ff8b;
+  --primary-dim:    rgba(57, 255, 139, 0.15);
+  --primary-glow:   rgba(57, 255, 139, 0.45);
+  --accent:         #5ecbff;
+  --accent-dim:     rgba(94, 203, 255, 0.15);
 
-  /* ── 状态色 ── */
-  --status-online:   #00e676;
-  --status-moving:   #2196f3;
-  --status-working:  #ff9800;
-  --status-error:    #ff3d71;
+  /* ── 兼容旧版 --primary-color（自动同步到 --primary）── */
+  --primary-color:  var(--primary);
+
+  /* ── 数据可视化色（深色版专用）── */
+  --viz-a: #39ff8b;
+  --viz-b: #ff6b6b;
+  --viz-c: #ffd166;
+  --viz-d: #5ecbff;
+
+  /* ── 霓虹发光 ── */
+  --neon:           #39ff8b;
+  --neon-soft:      #2bd977;
+  --neon-glow:      0 0 12px rgba(57,255,139,.45), 0 0 30px rgba(57,255,139,.18);
+
+  /* ── 状态色（低饱和，避免红绿灯过度）── */
+  --status-online:   #39ff8b;
+  --status-moving:   #5ecbff;
+  --status-working:  #ffd166;
+  --status-error:    #ff6b6b;
   --status-charging: #ab47bc;
-  --status-offline:  #546e7a;
+  --status-offline:  #6f7d74;
 
   /* ── 告警级别 ── */
-  --alert-info:     #3b82f6;
-  --alert-warn:     #f59e0b;
-  --alert-error:    #ef4444;
+  --alert-info:     #5ecbff;
+  --alert-warn:     #ffd166;
+  --alert-error:    #ff6b6b;
 
   /* ── 阴影/发光 ── */
-  --glow-primary:   0 0 12px rgba(0, 240, 255, 0.30);
-  --glow-primary-lg:0 0 24px rgba(0, 240, 255, 0.20);
-  --glow-error:     0 0 12px rgba(239, 68, 68, 0.35);
-  --shadow-card:    0 2px 8px rgba(0, 0, 0, 0.20);
-  --shadow-pop:     0 8px 24px rgba(0, 0, 0, 0.30);
+  --glow-primary:   0 0 12px rgba(57, 255, 139, 0.30);
+  --glow-primary-lg:0 0 24px rgba(57, 255, 139, 0.20);
+  --glow-error:     0 0 12px rgba(255, 107, 107, 0.35);
+  --shadow-card:    0 8px 30px rgba(0, 0, 0, 0.45);
+  --shadow-glass:   inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-pop:     0 8px 24px rgba(0, 0, 0, 0.40);
 
   /* ── 圆角 ── */
   --radius-sm: 6px;
@@ -66,6 +83,19 @@
   --dur-fast: 150ms;
   --dur-base: 250ms;
   --dur-slow: 400ms;
+
+  /* ── 数字孪生 · 3D 场景配色（深色科技感）── */
+  --scene-bg-top:     #0f1613;   /* Canvas 上半渐变 */
+  --scene-bg-bottom:  #0a0f0c;   /* Canvas 下半渐变（与 HUD 底无缝） */
+  --scene-fog:        #0a0f0c;   /* 雾色，边缘消融 */
+  --scene-floor:      #121916;   /* 地面深绿灰 */
+  --scene-grid-cell:  #1a2420;   /* 网格细线 */
+  --scene-grid-section: #39ff8b; /* 主分区线（品牌霓虹绿） */
+  --scene-shadow:     #000000;   /* 接触阴影 */
+  --scene-wall-perim: #2a3e34;   /* 外围墙体深青灰 */
+  --scene-wall-inner: #22342c;   /* 内部墙体 */
+  --scene-wall-perim-glow: #183a28; /* 外围墙发光色 */
+  --scene-wall-inner-glow: #193545; /* 内墙发光色（偏蓝） */
 }
 
 /* 贴牌换肤 */
@@ -89,36 +119,42 @@
 }
 
 /* ============================================================
-   浅色主题「Daylight Lab」—— data-theme="light"
-   青色为主、紫色为辅，整体加深一档满足 WCAG AA
-   发光特效统一迁移为阴影抬升 / 主色描边
+   浅色主题「Neon Glass Light」—— data-theme="light"
+   浅绿为主、无玻璃模糊，整体加深一档满足 WCAG AA
    ============================================================ */
 [data-theme="light"] {
-  /* ── 背景层级（从浅到略深）── */
-  --bg-base:      #eef2f8;
-  --bg-elev-1:    #f4f7fb;
-  --bg-elev-2:    #ffffff;
-  --bg-elev-3:    #f1f5f9;
-  --bg-glass:     rgba(255, 255, 255, 0.94);
+  /* ── 背景层级（从浅到略深，Neon Glass 浅绿调）── */
+  --bg-base:      #f4f6f5;
+  --bg-elev-1:    #ffffff;
+  --bg-elev-2:    #f8faf9;
+  --bg-elev-3:    #eef2f0;
+  --bg-glass:     rgba(255, 255, 255, 0.85);
 
   /* ── 边框 ── */
-  --border-subtle: rgba(15, 23, 42, 0.06);
-  --border-base:   rgba(15, 23, 42, 0.08);
-  --border-hover:  rgba(8, 145, 178, 0.35);
-  --border-focus:  rgba(8, 145, 178, 0.55);
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --border-base:   rgba(0, 0, 0, 0.08);
+  --border-hover:  rgba(22, 163, 74, 0.35);
+  --border-focus:  rgba(22, 163, 74, 0.55);
+  --border-strong: rgba(22, 163, 74, 0.35);
 
-  /* ── 文字（深色阶，白底对比度全部 ≥ 4.5:1）── */
-  --text-primary:   #0f172a;
-  --text-secondary: #475569;
-  --text-tertiary:  #64748b;
-  --text-disabled:  #94a3b8;
+  /* ── 文字（深绿灰阶，白底对比度全部 ≥ 4.5:1）── */
+  --text-primary:   #14301f;
+  --text-secondary: #3d5547;
+  --text-tertiary:  #5f7668;
+  --text-disabled:  #8a9a90;
+  --text-muted:     #7c8a80;
 
-  /* ── 品牌色（加深一档）── */
-  --primary:        #0891b2;
-  --primary-dim:    rgba(8, 145, 178, 0.10);
-  --primary-glow:   rgba(8, 145, 178, 0.28);
-  --accent:         #6d28d9;
-  --accent-dim:     rgba(109, 40, 217, 0.09);
+  /* ── 品牌色（加深一档的霓虹绿）── */
+  --primary:        #16a34a;
+  --primary-dim:    rgba(22, 163, 74, 0.10);
+  --primary-glow:   rgba(22, 163, 74, 0.28);
+  --accent:         #0891b2;
+  --accent-dim:     rgba(8, 145, 178, 0.09);
+
+  /* ── 霓虹变量（浅色：不发光，仅着色）── */
+  --neon:           #16a34a;
+  --neon-soft:      #16a34a;
+  --neon-glow:      none;
 
   /* ── 状态色（全部加深至 ≥ 4.5:1）── */
   --status-online:   #059669;
@@ -134,17 +170,18 @@
   --alert-error:    #dc2626;
 
   /* ── 数据可视化色（浅色专用加深）── */
-  --viz-a: #0891b2;
+  --viz-a: #16a34a;
   --viz-b: #e11d48;
   --viz-c: #d97706;
   --viz-d: #0d9488;
 
   /* ── 阴影（浅色柔和投影，取代发光）── */
-  --glow-primary:   0 4px 14px rgba(8, 145, 178, 0.20);
-  --glow-primary-lg:0 6px 20px rgba(8, 145, 178, 0.28);
+  --glow-primary:   0 4px 14px rgba(22, 163, 74, 0.18);
+  --glow-primary-lg:0 6px 20px rgba(22, 163, 74, 0.25);
   --glow-error:     0 4px 14px rgba(220, 38, 38, 0.22);
-  --shadow-card:    0 1px 3px rgba(15, 23, 42, 0.05), 0 6px 20px rgba(15, 23, 42, 0.05);
-  --shadow-pop:     0 12px 32px rgba(15, 23, 42, 0.14);
+  --shadow-card:    0 1px 3px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.06);
+  --shadow-glass:   inset 0 1px 0 rgba(0, 0, 0, 0.04);
+  --shadow-pop:     0 12px 32px rgba(15, 23, 42, 0.12);
 
   /* ── 圆角（统一 +2px 更现代）── */
   --radius-sm: 8px;
@@ -156,6 +193,19 @@
   --dur-fast: 120ms;
   --dur-base: 200ms;
   --dur-slow: 320ms;
+
+  /* ── 数字孪生 · 3D 场景配色（浅色版）── */
+  --scene-bg-top:     #e8eef5;
+  --scene-bg-bottom:  #d1dae8;
+  --scene-fog:        #dde4f0;
+  --scene-floor:      #e2e8f0;
+  --scene-grid-cell:  #b8c4d8;
+  --scene-grid-section: #4a9eff;
+  --scene-shadow:     #5a6a85;
+  --scene-wall-perim: #8a9ab5;
+  --scene-wall-inner: #a8b8d0;
+  --scene-wall-perim-glow: #c8d4e8;
+  --scene-wall-inner-glow: #d8e2f0;
 }
 
 /* 浅色主题：贴牌品牌色加深一档（保证白底对比度） */
@@ -178,10 +228,10 @@
   --glow-primary: 0 4px 14px rgba(5, 150, 105, 0.22);
 }
 
-/* ── 浅色主题：body 背景（浅青径向光晕 + 细网格）── */
+/* ── 浅色主题：body 背景（浅绿径向光晕 + 细网格）── */
 [data-theme="light"] body {
   background:
-    radial-gradient(ellipse 90% 55% at 50% -5%, rgba(8, 145, 178, 0.07), transparent 60%),
+    radial-gradient(ellipse 90% 55% at 50% -5%, rgba(22, 163, 74, 0.06), transparent 60%),
     var(--bg-base);
 }
 [data-theme="light"] body::before {
@@ -793,11 +843,6 @@ input:focus, select:focus, textarea:focus {
   50%      { box-shadow: 0 0 16px var(--primary-glow); }
 }
 
-@keyframes pulse-dot {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50%      { transform: scale(1.3); opacity: 0.7; }
-}
-
 /* ─── RobotStatusCard ─── */
 .robot-card {
   position: relative;
@@ -984,4 +1029,82 @@ input:focus, select:focus, textarea:focus {
   color: var(--primary);
   text-shadow: 0 0 12px var(--primary-glow);
   margin-right: 4px;
+}
+
+/* ============================================================
+   Neon Glass · 核心动画关键帧（统一使用 ng- 前缀）
+   ============================================================ */
+@keyframes ng-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+@keyframes ng-soft-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0); }
+  50%      { box-shadow: 0 0 0 6px rgba(255, 107, 107, 0.18); }
+}
+
+@keyframes ng-fade-in-up {
+  0%   { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ng-slide-in-right {
+  0%   { opacity: 0; transform: translateX(20px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+/* Neon Glass · 动画工具类 */
+.ng-anim-fade-in {
+  animation: ng-fade-in-up 0.16s ease-out both;
+}
+.ng-anim-slide-in {
+  animation: ng-slide-in-right 0.16s ease-out both;
+}
+.ng-anim-error {
+  animation: ng-soft-pulse 1.2s infinite;
+}
+
+/* Neon Glass · 品牌 Badge 类 */
+.ng-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Neon Glass · 玻璃卡片悬浮（通用增强） */
+.glass-card {
+  background: var(--bg-glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border-base);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card), var(--shadow-glass);
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.glass-card:hover {
+  border-color: var(--border-strong);
+}
+.glass-card--highlight {
+  border-color: var(--border-strong);
+  box-shadow: var(--neon-glow), var(--shadow-card), var(--shadow-glass);
+}
+
+/* Neon Glass · 移动端降级（<768px） */
+@media (max-width: 768px) {
+  .glass-card,
+  .card,
+  .robot-card,
+  .sidebar {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .glass-card--highlight {
+    box-shadow: var(--shadow-card), var(--shadow-glass);
+  }
 }

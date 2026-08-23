@@ -20,7 +20,7 @@ export function NodeEditButton({ nodeId }: { nodeId: string }) {
         height: 24,
         borderRadius: 6,
         border: 'none',
-        background: 'rgba(0,0,0,0.06)',
+        background: 'var(--border-subtle)',
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
@@ -29,15 +29,15 @@ export function NodeEditButton({ nodeId }: { nodeId: string }) {
         zIndex: 5,
         opacity: 0,
         transition: 'opacity 0.15s, background 0.15s',
-        color: '#666',
+        color: 'var(--text-tertiary)',
       }}
       onMouseEnter={(e) => {
-        ;(e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,0,0,0.12)'
-        ;(e.currentTarget as HTMLButtonElement).style.color = '#333'
+        ;(e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-elev-3)'
+        ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)'
       }}
       onMouseLeave={(e) => {
-        ;(e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,0,0,0.06)'
-        ;(e.currentTarget as HTMLButtonElement).style.color = '#666'
+        ;(e.currentTarget as HTMLButtonElement).style.background = 'var(--border-subtle)'
+        ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--text-tertiary)'
       }}
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

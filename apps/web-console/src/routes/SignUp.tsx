@@ -20,32 +20,36 @@ export function SignUp() {
           justifyContent: 'center',
           alignItems: 'center',
           height: '100vh',
-          background: '#0f172a',
-          color: 'white',
+          background: 'var(--bg-base)',
+          color: 'var(--text-primary)',
         }}
       >
         <div
           style={{
-            background: '#1e293b',
+            background: 'var(--bg-elev-2)',
             padding: 32,
             borderRadius: 16,
             width: 380,
             textAlign: 'center',
+            border: '1px solid var(--border-base)',
+            boxShadow: 'var(--shadow-card)',
           }}
         >
           <h2 style={{ marginTop: 0 }}>🚀 创建账号</h2>
-          <p style={{ color: '#94a3b8', fontSize: 14 }}>Supabase 未配置，无法注册。</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Supabase 未配置，无法注册。</p>
           <a
             href="/"
             style={{
               display: 'inline-block',
               marginTop: 16,
               padding: '10px 24px',
-              background: '#3b82f6',
-              color: 'white',
+              background: 'var(--primary)',
+              color: '#0a0e1a',
               borderRadius: 8,
               textDecoration: 'none',
               fontSize: 14,
+              fontWeight: 600,
+              boxShadow: 'var(--glow-primary)',
             }}
           >
             返回首页（mock 模式）
@@ -79,7 +83,7 @@ export function SignUp() {
     const { error: tenantError } = await supabase!.from('tenants').insert({
       slug: tenantSlug,
       name: tenantName,
-      primary_color: '#3b82f6',
+      primary_color: '#39ff8b',
     })
 
     if (tenantError) {
@@ -98,20 +102,22 @@ export function SignUp() {
         justifyContent: 'center',
         alignItems: 'center',
         height: '100vh',
-        background: '#0f172a',
-        color: 'white',
+        background: 'var(--bg-base)',
+        color: 'var(--text-primary)',
       }}
     >
       <form
         onSubmit={handleSignUp}
         style={{
-          background: '#1e293b',
+          background: 'var(--bg-elev-2)',
           padding: 32,
           borderRadius: 16,
           width: 400,
           display: 'flex',
           flexDirection: 'column',
           gap: 16,
+          border: '1px solid var(--border-base)',
+          boxShadow: 'var(--shadow-card)',
         }}
       >
         <h2 style={{ margin: 0, textAlign: 'center' }}>🚀 创建账号</h2>
@@ -122,7 +128,6 @@ export function SignUp() {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          style={{ padding: 12, borderRadius: 8, border: 'none', fontSize: 14 }}
         />
 
         <input
@@ -131,7 +136,6 @@ export function SignUp() {
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          style={{ padding: 12, borderRadius: 8, border: 'none', fontSize: 14 }}
         />
 
         <input
@@ -141,7 +145,6 @@ export function SignUp() {
           onChange={(e) =>
             setTenantSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))
           }
-          style={{ padding: 12, borderRadius: 8, border: 'none', fontSize: 14 }}
         />
 
         <input
@@ -149,11 +152,10 @@ export function SignUp() {
           required
           value={tenantName}
           onChange={(e) => setTenantName(e.target.value)}
-          style={{ padding: 12, borderRadius: 8, border: 'none', fontSize: 14 }}
         />
 
         {message && (
-          <div style={{ color: message.startsWith('✅') ? '#34d399' : '#f87171', fontSize: 13 }}>
+          <div style={{ color: message.startsWith('✅') ? 'var(--status-online)' : 'var(--status-error)', fontSize: 13 }}>
             {message}
           </div>
         )}
@@ -165,16 +167,18 @@ export function SignUp() {
             padding: 12,
             borderRadius: 8,
             border: 'none',
-            background: '#3b82f6',
-            color: 'white',
+            background: 'linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%)',
+            color: '#0a0e1a',
             fontSize: 15,
             cursor: 'pointer',
+            fontWeight: 600,
+            boxShadow: 'var(--glow-primary)',
           }}
         >
           {loading ? '创建中...' : '创建账号'}
         </button>
 
-        <a href="/login" style={{ textAlign: 'center', color: '#60a5fa', fontSize: 13, textDecoration: 'none' }}>
+        <a href="/login" style={{ textAlign: 'center', color: 'var(--primary)', fontSize: 13, textDecoration: 'none' }}>
           已有账号？去登录 →
         </a>
       </form>

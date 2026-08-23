@@ -6,7 +6,7 @@ interface Props {
 }
 
 // 租户 Logo + 名称（贴牌用）
-export function TenantLogo({ logoUrl, tenantName, primaryColor = '#1890ff', size = 32 }: Props) {
+export function TenantLogo({ logoUrl, tenantName, primaryColor = '#39ff8b', size = 32 }: Props) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       {logoUrl ? (
@@ -33,7 +33,7 @@ export function TenantLogo({ logoUrl, tenantName, primaryColor = '#1890ff', size
           {tenantName.charAt(0).toUpperCase()}
         </div>
       )}
-      <span style={{ fontWeight: 600, fontSize: 15, color: '#333' }}>{tenantName}</span>
+      <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)' }}>{tenantName}</span>
     </div>
   )
 }

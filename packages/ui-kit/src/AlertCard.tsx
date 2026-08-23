@@ -1,9 +1,9 @@
 import type { UnifiedAlert } from 'robot-adapter-kit'
 
 const levelStyle: Record<UnifiedAlert['level'], { bg: string; border: string; icon: string }> = {
-  info:  { bg: '#eff6ff', border: '#3b82f6', icon: 'ℹ️' },
-  warn:  { bg: '#fefce8', border: '#eab308', icon: '⚠️' },
-  error: { bg: '#fef2f2', border: '#ef4444', icon: '🚨' },
+  info:  { bg: 'var(--accent-dim)', border: 'var(--alert-info)', icon: 'ℹ️' },
+  warn:  { bg: 'rgba(255, 209, 102, 0.12)', border: 'var(--alert-warn)', icon: '⚠️' },
+  error: { bg: 'rgba(255, 107, 107, 0.12)', border: 'var(--alert-error)', icon: '🚨' },
 }
 
 export function AlertCard({ alert }: { alert: UnifiedAlert }) {
@@ -17,9 +17,10 @@ export function AlertCard({ alert }: { alert: UnifiedAlert }) {
     }}>
       <span>{s.icon}</span>
       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        <strong>{alert.robotId}</strong> · {alert.message}
+        <strong style={{ color: 'var(--text-primary)' }}>{alert.robotId}</strong>
+        <span style={{ color: 'var(--text-secondary)' }}> · {alert.message}</span>
       </span>
-      <span style={{ color: '#9ca3af', fontSize: 11 }}>
+      <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
         {new Date(alert.timestamp).toLocaleTimeString()}
       </span>
     </div>
