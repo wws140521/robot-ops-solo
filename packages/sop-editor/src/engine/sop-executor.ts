@@ -78,6 +78,7 @@ export class SopExecutor {
     // 2026-08-19 联合类型宽松访问，兼容简版和完整版 SOP schema
     // TODO: 后续加严格类型守卫替代 JSON 宽松访问
     const data = node.data as any
+    console.log('[sop-exec] executeNode:', { nodeId: node.id, type, label: data?.label })
 
     switch (type) {
       case 'boot':
@@ -89,6 +90,7 @@ export class SopExecutor {
         if (target) {
           const waypoint = this.graph.waypoints?.[target]
           if (!waypoint) throw new Error(`航点不存在: ${target}`)
+          console.log('[sop-exec] move 节点:', { target, speed: data.speed ?? 0.7, waypoint: { x: waypoint.x, y: waypoint.y } })
           await this.ctx.moveTo(target, data.speed ?? 0.7)
         }
         if (data.waitForCharge) {
@@ -104,6 +106,7 @@ export class SopExecutor {
 
       case 'pickup': {
         const weight = this.ctx.checkWeight()
+        console.log('[sop-exec] pickup 节点:', { weight, minWeight: data.minWeight ?? 200 })
         if (data.checkWeight && weight < (data.minWeight ?? 200)) {
           console.log(`[SOP] 托盘为空 (${weight}g)，等待重新装载`)
           this.currentNodeId = 'wait_signal'
@@ -134,6 +137,7 @@ export class SopExecutor {
       case 'condition': {
         const fieldValue = this.getFieldValue(data.field)
         const passed = this.evalCondition(fieldValue, data.operator, data.value)
+        console.log('[sop-exec] condition 节点:', { field: data.field, fieldValue, operator: data.operator, target: data.value, passed })
         this.currentNodeId = passed
           ? (data.onTrue ?? data.trueNodeId ?? null)
           : (data.onFalse ?? data.falseNodeId ?? null)
@@ -150,10 +154,15 @@ export class SopExecutor {
 
   private findNextNode(node: SopNode): string | null {
     const edges = this.edgeMap.get(node.id) ?? []
-    if (edges.length === 0) return null
+    if (edges.length === 0) {
+      console.log('[sop-exec] findNextNode: 无出边, 流程结束:', node.id)
+      return null
+    }
     // 2026-08-18 优先选无 label 的默认边，其次按条件选
     const defaultEdge = edges.find((e) => !e.label)
-    return (defaultEdge ?? edges[0]).target
+    const next = (defaultEdge ?? edges[0]).target
+    console.log('[sop-exec] findNextNode:', { from: node.id, candidates: edges.map(e => e.target), selected: next })
+    return next
   }
 
   private getFieldValue(field: string): number {

@@ -61,5 +61,9 @@ export function getCellType(worldX: number, worldZ: number): CellType {
 // 2026-08-18 穿模检测：在障碍格内返回 true
 export function isObstacle(worldX: number, worldZ: number): boolean {
   const t = getCellType(worldX, worldZ)
-  return t === 'wall' || t === 'table'
+  if (t === 'wall' || t === 'table') {
+    console.warn('[collision] 穿模检测命中:', { worldX: worldX.toFixed(2), worldZ: worldZ.toFixed(2), cellType: t })
+    return true
+  }
+  return false
 }

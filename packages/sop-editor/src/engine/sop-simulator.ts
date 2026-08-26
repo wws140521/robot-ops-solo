@@ -37,6 +37,7 @@ export function createSimulator(graph: SopGraph, events: SimEvents) {
     moveTo: async (target, speed) => {
       events.onMove?.(`(${pos.x.toFixed(1)},${pos.y.toFixed(1)})`, target)
       events.onLog?.(`  移动 → ${target} (速度 ${speed})`)
+      console.log('[sop-sim] moveTo:', { from: { x: pos.x, y: pos.y }, target, speed })
       await new Promise((r) => setTimeout(r, 600))
       const wp = graph.waypoints?.[target] as Waypoint | undefined
       if (wp) {
@@ -47,6 +48,7 @@ export function createSimulator(graph: SopGraph, events: SimEvents) {
       batteryPct = Math.max(0, batteryPct - 15)
       ctx.batteryPct = batteryPct
       advance(25) // 模拟 25 分钟行程
+      console.log('[sop-sim] moveTo 完成:', { target, batteryAfter: batteryPct, simTime: new Date(simNow).toLocaleTimeString() })
       emitState()
     },
 
@@ -81,10 +83,12 @@ export function createSimulator(graph: SopGraph, events: SimEvents) {
 
     charge: async (minutes) => {
       events.onLog?.(`  🔌 充电 ${minutes} 分钟`)
+      console.log('[sop-sim] charge:', { minutes, batteryBefore: batteryPct })
       await new Promise((r) => setTimeout(r, 1500))
       batteryPct = Math.min(95, batteryPct + 30)
       ctx.batteryPct = batteryPct
       events.onLog?.(`  ✅ 电量恢复至 ${batteryPct}%`)
+      console.log('[sop-sim] charge 完成:', { batteryAfter: batteryPct })
       advance(minutes)
       emitState()
     },

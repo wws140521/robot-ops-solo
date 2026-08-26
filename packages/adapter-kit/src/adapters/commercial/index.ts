@@ -44,13 +44,18 @@ export function adaptIncoming(
   raw: any,
   robotId: string
 ): UnifiedRobotState {
+  // 2026-08-21 埋点：适配器入口，记录品牌+robotId 便于追踪数据流
+  console.log('[adapter] adaptIncoming 入口:', { brand, robotId, rawKeys: Object.keys(raw ?? {}) })
+  let state: UnifiedRobotState
   switch (brand) {
-    case 'unitree':   return adaptUnitree(raw, robotId)
-    case 'keenon':    return adaptKeenon(raw, robotId)
-    case 'agibot':    return adaptAgibot(raw, robotId)
-    case 'pudutech':  return adaptPudutech(raw, robotId)
-    default:          return fallbackState(brand, raw, robotId)
+    case 'unitree':   state = adaptUnitree(raw, robotId); break
+    case 'keenon':    state = adaptKeenon(raw, robotId); break
+    case 'agibot':    state = adaptAgibot(raw, robotId); break
+    case 'pudutech':  state = adaptPudutech(raw, robotId); break
+    default:          state = fallbackState(brand, raw, robotId); break
   }
+  console.log('[adapter] adaptIncoming 出口:', { brand, robotId, battery: state.batteryPct, status: state.status })
+  return state
 }
 
 export function adaptIncomingAlert(
@@ -75,7 +80,10 @@ export function adaptCommercial(
   raw: any
 ): { state: UnifiedRobotState; alerts: UnifiedAlert[] } {
   const robotId = raw?.robot_id ?? raw?.robotId ?? `robot-${Date.now()}`
+  console.log('[adapter] adaptCommercial 聚合入口:', { brand, robotId })
   const state = adaptIncoming(brand, raw, robotId)
   const alert = adaptIncomingAlert(brand, raw, robotId)
-  return { state, alerts: alert ? [alert] : [] }
+  const result = { state, alerts: alert ? [alert] : [] }
+  console.log('[adapter] adaptCommercial 聚合出口:', { robotId, stateStatus: state.status, alertCount: result.alerts.length })
+  return result
 }

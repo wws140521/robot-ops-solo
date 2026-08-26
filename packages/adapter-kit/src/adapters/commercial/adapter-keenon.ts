@@ -18,7 +18,8 @@ export function adaptKeenon(
   raw: KeenonRawMsg,
   robotId: string
 ): UnifiedRobotState {
-  return {
+  console.log('[adapter-keenon] 输入:', { cmd: raw.cmd, battery: raw.payload.level, status: raw.payload.status, err: raw.payload.err })
+  const state: UnifiedRobotState = {
     robotId,
     brand: 'keenon',
     model: 'peanut',
@@ -34,6 +35,8 @@ export function adaptKeenon(
     errorCode: raw.payload.err,
     lastSeen: Date.now(),
   }
+  console.log('[adapter-keenon] 输出:', { robotId, battery: state.batteryPct, status: state.status, theta: state.position.theta })
+  return state
 }
 
 function mapKeenonStatus(s?: number): UnifiedRobotState['status'] {

@@ -25,6 +25,7 @@ export const useRobotStore = create<RobotStore>((set) => ({
     set((s) => {
       const robots = { ...s.robots, [id]: state }
       const onlineCount = Object.values(robots).filter((r) => r.online).length
+      console.log('[robotStore] updateRobot:', { id, status: state.status, battery: state.batteryPct, online: state.online, totalOnline: onlineCount })
       return { robots, onlineCount }
     }),
 
@@ -65,6 +66,7 @@ export const useRobotStore = create<RobotStore>((set) => ({
         Object.entries(s.robots).map(([id, r]) => {
           if (r.online && now - r.lastSeen > STALE_MS) {
             changed = true
+            console.warn('[robotStore] 离线检测命中:', { id, staleMs: now - r.lastSeen, threshold: STALE_MS })
             return [id, { ...r, online: false, status: 'error' as const }]
           }
           return [id, r]

@@ -477,3 +477,44 @@ console.log('  G1         → ws://localhost:8080  (8方向避障巡航)')
 console.log('  Peanut     → ws://localhost:8081')
 console.log('  Industrial → ws://localhost:8082  (FANUC/KUKA/埃斯顿 轮流)')
 console.log(`[mock] 栅格地图: ${GRID.cols}x${GRID.rows}  世界范围 X: [${GRID_OX}, ${GRID_OX + GRID.cols * GRID.cellSize}]  Z: [${GRID_OZ}, ${GRID_OZ + GRID.rows * GRID.cellSize}]`)
+
+// 2026-08-21 OTA mock 广播：模拟 ota-agent 上报状态到 MQTT broker
+// 在真实环境中由 ota_agent.py 上报到 roboticsops/ota/{robot_id}/status
+// mock 模式：通过 WebSocket 以 industrial 通道携带 OTA 状态帧
+// 让 wsHub 的 OTA 分流能收到数据（模拟模式无独立 MQTT broker 时降级）
+const OTA_ROBOTS = [
+  { robotId: 'FANUC_M20iD_001', version: '1.1.3' },
+  { robotId: 'KUKA_KR6_001',     version: '1.1.3' },
+  { robotId: 'ESTUN_ER3A_001',  version: '1.1.3' },
+]
+const OTA_STATES = ['IDLE', 'DOWNLOADING', 'VERIFYING', 'INSTALLING', 'HEALTH_CHECK', 'SUCCESS']
+let otaIdx = 0
+
+setInterval(() => {
+  const target = OTA_ROBOTS[otaIdx % OTA_ROBOTS.length]
+  const stateIdx = otaIdx % OTA_STATES.length
+  const state = OTA_STATES[stateIdx]
+  const progress = stateIdx === 0 ? 0 : stateIdx === 1 ? 25 : stateIdx === 2 ? 50 : stateIdx === 3 ? 75 : stateIdx === 4 ? 90 : 100
+  const version = state === 'SUCCESS' ? '1.2.0' : target.version
+
+  // 构造 OTA 状态消息（通过 industrial WS 通道携带，前端 wsHub 会按 type 分流）
+  const otaMsg = {
+    type: 'ota_status',
+    robotId: target.robotId,
+    state,
+    progress,
+    version,
+    message: state === 'IDLE' ? 'agent idle' : state === 'SUCCESS' ? 'upgrade success' : `mock ${state.toLowerCase()}`,
+    campaign_id: `cmp-mock-${otaIdx}`,
+  }
+  // 广播到所有 8082 连接
+  wssIndustrial.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(otaMsg))
+    }
+  })
+  otaIdx++
+}, 8000) // 每 8 秒推一台设备的下一个状态
+
+console.log('  OTA        → via ws://localhost:8082  (OTA 状态轮播 8s/帧)')
+

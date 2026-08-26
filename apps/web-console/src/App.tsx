@@ -10,6 +10,7 @@ import { SopSimPage } from './routes/SopSimPage'
 import { TwinPage } from './routes/TwinPage'
 import { AlertsPage } from './routes/AlertsPage'
 import { TenantsPage } from './routes/TenantsPage'
+import { OtaPage } from './routes/OtaPage'
 import { Login } from './routes/LoginPage'
 import { SignUp } from './routes/SignUp'
 import { startWS, stopAllWS } from './lib/wsHub'
@@ -37,6 +38,7 @@ function MainLayout() {
           <Route path="/twin/:id" element={<TwinPage />} />
           <Route path="/alerts" element={<AlertsPage />} />
           <Route path="/tenants" element={<TenantsPage />} />
+          <Route path="/ota" element={<OtaPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

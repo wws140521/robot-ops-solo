@@ -2,23 +2,36 @@ import { RobotWSClient, adaptIncoming, adaptIncomingAlert, adaptByBrandEnhanced,
 import { useRobotStore } from '../stores/robotStore'
 import { useAlertStore } from '../stores/alertStore'
 import { useSpeakStore, type SpeakEvent } from '../stores/speakStore'
+import { useOtaStore } from '../stores/otaStore'
 import { writeRobotState } from './robotStorage'
 import { writeAlert } from './alertStorage'
 // 2026-08-18 工业品牌集合
 const INDUSTRIAL_BRANDS = new Set(['fanuc', 'kuka', 'estun', 'yaskawa'])
 // 2026-08-18 wsHub 初始化，工业消息分流入口
-connectMqtt((state, alerts) => {
-  const { updateRobot } = useRobotStore.getState();
-  const { addAlert } = useAlertStore.getState();
-  updateRobot(state.robotId, state);
-  if (alerts.length > 0) {
-    alerts.forEach((a) => addAlert(a));
+// 2026-08-21 接入 OTA 状态回调，将 MQTT ota/+/status 消息路由到 otaStore
+connectMqtt(
+  (state, alerts) => {
+    const { updateRobot } = useRobotStore.getState();
+    const { addAlert } = useAlertStore.getState();
+    updateRobot(state.robotId, state);
+    if (alerts.length > 0) {
+      alerts.forEach((a) => addAlert(a));
+    }
+  },
+  (robotId, state, progress, message, campaignId) => {
+    console.log('[wsHub] OTA status 路由:', { robotId, state, progress })
+    useOtaStore.getState().updateFromBackend(
+      robotId,
+      state as any, progress, message, campaignId
+    )
   }
-});
+);
 // 处理工业遥测消息（industrial_state / industrial_alert）
 function handleIndustrialMessage(msg: any) {
   try {
+    console.log('[wsHub] handleIndustrialMessage:', { type: msg.type, brand: msg.brand, payloadKeys: Object.keys(msg.payload ?? {}) })
     const { state, alerts } = adaptByBrandEnhanced(msg.brand, msg.payload)
+    console.log('[wsHub] adaptByBrandEnhanced 完成:', { robotId: state.robotId, status: state.status, battery: state.batteryPct, alertCount: alerts.length })
     if (msg.type === 'industrial_state') {
       useRobotStore.getState().updateRobot(state.robotId, state)
       writeRobotState(state, msg.payload)
@@ -139,6 +152,14 @@ export function startWS(connections: WsConnection[]) {
             handleIndustrialMessage(raw)
             return
           }
+          // 2026-08-21 OTA 状态分流（type: ota_status，mock 模式通过 WS 携带）
+          if (raw?.type === 'ota_status') {
+            console.log('[wsHub] OTA 状态分流:', { robotId: raw.robotId, state: raw.state, progress: raw.progress })
+            useOtaStore.getState().updateFromBackend(
+              raw.robotId, raw.state, raw.progress, raw.message, raw.campaign_id
+            )
+            return
+          }
 
           if (isSpeakMessage(raw)) {
             handleSpeak(raw, robotId)
@@ -150,6 +171,7 @@ export function startWS(connections: WsConnection[]) {
             }
           } else {
             const state = adaptIncoming(brand, raw, robotId)
+            console.log('[wsHub] 商用适配完成:', { robotId, brand, status: state.status, battery: state.batteryPct })
             useRobotStore.getState().updateRobot(robotId, state)
             writeRobotState(state, raw) // 写入 Supabase robot_states 表（离线模式自动跳过）
           }
@@ -185,6 +207,7 @@ export function sendCommand(robotId: string, topic: string, payload: any): boole
     console.warn(`[wsHub] sendCommand 失败：未找到机器人 ${robotId}`)
     return false
   }
+  console.log('[wsHub] sendCommand:', { robotId, topic, payload })
   client.send(topic, payload)
   return true
 }

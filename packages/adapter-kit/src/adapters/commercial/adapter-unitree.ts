@@ -19,13 +19,14 @@ export function adaptUnitree(
   raw: UnitreeRawMsg,
   robotId: string
 ): UnifiedRobotState {
+  console.log('[adapter-unitree] 输入:', { topic: raw.topic, battery: raw.data.percentage, voltage: raw.data.voltage, hasJoints: !!raw.data.joints })
   const batteryLow = (raw.data.percentage ?? 100) < 10
   // TODO: 多轴联动时 joint 角速度需单独换算，当前只取静态值
   if (raw.data.joints && Object.keys(raw.data.joints).length !== 6) {
     console.warn('[adapter] 宇树轴数异常:', Object.keys(raw.data.joints).length, '期望 6')
   }
 
-  return {
+  const state: UnifiedRobotState = {
     robotId,
     brand: 'unitree',
     model: 'g1',
@@ -42,10 +43,13 @@ export function adaptUnitree(
     errorCode: raw.data.error_code ? `U${raw.data.error_code}` : undefined,
     lastSeen: Date.now(),
   }
+  console.log('[adapter-unitree] 输出:', { robotId, battery: state.batteryPct, status: state.status, errorCode: state.errorCode })
+  return state
 }
 
 // 2026-08-19 补充宇树告警双通道映射，修复状态帧内嵌 error_code 漏判
 export function adaptUnitreeAlert(raw: UnitreeRawMsg, robotId: string): UnifiedAlert | null {
+  console.log('[adapter-unitree] 告警适配入口:', { topic: raw.topic, hasError: !!raw.data?.error_code, code: raw.data?.code })
   // /alert 主题：{ code, msg }
   if (raw.topic === '/alert' && raw.data) {
     const code = raw.data.code ?? 'UNKNOWN'

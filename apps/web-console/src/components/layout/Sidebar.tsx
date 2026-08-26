@@ -11,6 +11,7 @@ import {
   Building2,
   Sun,
   Moon,
+  DownloadCloud,
   type LucideIcon,
 } from 'lucide-react'
 import { useTenantStore } from '../../stores/tenantStore'
@@ -26,6 +27,7 @@ const navItems: { to: string; label: string; icon: LucideIcon; end: boolean }[] 
   { to: '/twin',    label: '数字孪生',  icon: Box,             end: false },
   { to: '/alerts',  label: '告警中心',  icon: Bell,            end: false },
   { to: '/tenants', label: '租户管理',  icon: Building2,       end: false },
+  { to: '/ota',     label: 'OTA 升级',  icon: DownloadCloud,   end: false },
 ]
 
 export function Sidebar() {
