@@ -160,6 +160,15 @@
 - ✅ 降低 Grid 线宽：cellThickness 0.5→0.08、sectionThickness 1→0.15，减少深度缓冲竞争
 - ✅ 鼠标拖拽动态验证通过：连续拖拽 30 帧网格线稳定可见无闪烁
 
+### 2026-08-28 · 3D 视图专业化升级（HUD 标签 + 金属地面 + 性能降级）
+
+- ✅ 新建 HUDLabel.tsx：drei Html 3D 空间锚定，显示机器人 ID/品牌/状态/电量，distanceFactor=4 自动缩放，occlude="blending" 遮挡半透明
+- ✅ Floor.tsx 升级 MeshReflectorMaterial：实时反射/镜像效果，mixStrength=1.2 金属质感，mirror=0.5
+- ✅ RobotViewer 添加 AdaptiveDpr(pixelated) + AdaptiveEvents：低配设备自动降低像素比+减少事件监听
+- ✅ RobotViewer 添加 Suspense 包裹机器人组件：为后续 useGLTF/URDF 异步加载预留兜底
+- ✅ HUDLabel 导出到包入口 index.ts
+- ✅ 浏览器验证：Floor 反射清晰可见，HUDLabel 正确锚定在机器人上方显示实时状态
+
 ### 2026-08-26 · OTA 升级模块 + 深色主题修复 + 数字孪生场景适配 + 软著合规改造
 
 - ✅ 新增 OTA 升级管理页 OtaPage.tsx（设备状态卡片 + 进度条 + 前置校验 + 批量升级 + 模拟失败 + 操作日志）

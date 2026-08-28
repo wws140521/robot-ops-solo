@@ -160,7 +160,7 @@ robot-ops-solo/
 │   │   │   │   ├── FanucArm.tsx        #     FANUC M-20iD 6 轴机械臂 · 基座+6关节+法兰+夹爪
 │   │   │   │   └── KukaArm.tsx         #     KUKA KR6 6 轴机械臂 · 橙色涂装+关节联动
 │   │   │   ├── environment/
-│   │   │   │   ├── Floor.tsx           #   地面网格 · SLAM 坐标系可视化 · CSS 变量桥接
+│   │   │   │   ├── Floor.tsx           #   金属感地面 · MeshReflectorMaterial 实时反射 · CSS 变量桥接
 │   │   │   │   ├── SlamMap.tsx         #   SLAM 建图叠加 · 障碍物渲染
 │   │   │   │   └── collision.ts       #   碰撞检测工具 · AABB 包围盒 · 穿模检测
 │   │   │   ├── hooks/
@@ -168,9 +168,10 @@ robot-ops-solo/
 │   │   │   ├── overlays/
 │   │   │   │   ├── TrajectoryLine.tsx #   轨迹线 · 历史路径渲染
 │   │   │   │   ├── GlowTrajectory.tsx  #   发光轨迹 · 渐变尾迹效果
-│   │   │   │   └── StatusBadge.tsx    #   状态标签 · 3D 空间中悬浮文字
-│   │   │   │   ├── RobotViewer.tsx         #   3D 查看器主组件 · Canvas+相机+灯光+静态场景 memo 化+网格闪烁修复
-│   │   │   └── index.ts                #   包入口（重导出 FanucArm/KukaArm + renderRobotModel）
+│   │   │   │   ├── StatusBadge.tsx    #   状态标签 · 3D 空间中悬浮文字
+│   │   │   │   └── HUDLabel.tsx       #   HUD 标签 · drei Html 空间锚定机器人 ID/电量/状态
+│   │   │   ├── RobotViewer.tsx         #   3D 查看器主组件 · Canvas+AdaptiveDpr+Suspense+HUDLabel
+│   │   │   └── index.ts                #   包入口（重导出 FanucArm/KukaArm/HUDLabel + renderRobotModel）
 │   │   └── tsconfig.json
 │   │
 │   └── ui-kit/                         # React 包 · 跨页面共用 UI 组件
