@@ -22,6 +22,7 @@ export function adaptEstun(
 ): { state: UnifiedRobotState; alerts: UnifiedAlert[] } {
   const joints: JointTelemetry[] = (raw.joints || []).map((j: any) => ({
     j: j.j,
+    angle_rad: j.angle_rad,
     load_pct: j.load_pct ?? 0,
     temp_c: j.temp_c,
     current_a: j.current_a,

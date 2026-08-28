@@ -371,6 +371,7 @@ function generateIndustrialPose(seed) {
 
 function mockFanucTelemetry() {
   const now = new Date().toISOString()
+  const t = Date.now() / 1000
   return {
     type: 'industrial_state',
     brand: 'fanuc',
@@ -380,12 +381,12 @@ function mockFanucTelemetry() {
       timestamp: now,
       pose: generateIndustrialPose(),
       joints: [
-        { j: 1, load_pct: 62, temp_c: 41, current_a: 3.1, speed_rpm: 120, health_score: 88 },
-        { j: 2, load_pct: 118, temp_c: 67, current_a: 5.4, speed_rpm: 90, health_score: 54, rul_days: 9 },
-        { j: 3, load_pct: 45, temp_c: 38, current_a: 2.1, speed_rpm: 150, health_score: 92 },
-        { j: 4, load_pct: 30, temp_c: 35, current_a: 1.8, speed_rpm: 200, health_score: 95 },
-        { j: 5, load_pct: 25, temp_c: 33, current_a: 1.2, speed_rpm: 180, health_score: 97 },
-        { j: 6, load_pct: 18, temp_c: 31, current_a: 0.9, speed_rpm: 240, health_score: 99 },
+        { j: 1, angle_rad: Math.sin(t * 0.5) * 0.8, load_pct: 62, temp_c: 41, current_a: 3.1, speed_rpm: 120, health_score: 88 },
+        { j: 2, angle_rad: 0.3 + Math.sin(t * 0.7) * 0.4, load_pct: 118, temp_c: 67, current_a: 5.4, speed_rpm: 90, health_score: 54, rul_days: 9 },
+        { j: 3, angle_rad: -0.5 + Math.sin(t * 0.9) * 0.3, load_pct: 45, temp_c: 38, current_a: 2.1, speed_rpm: 150, health_score: 92 },
+        { j: 4, angle_rad: Math.sin(t * 1.1) * 0.6, load_pct: 30, temp_c: 35, current_a: 1.8, speed_rpm: 200, health_score: 95 },
+        { j: 5, angle_rad: Math.sin(t * 1.3) * 0.5, load_pct: 25, temp_c: 33, current_a: 1.2, speed_rpm: 180, health_score: 97 },
+        { j: 6, angle_rad: Math.sin(t * 1.5) * 0.4, load_pct: 18, temp_c: 31, current_a: 0.9, speed_rpm: 240, health_score: 99 },
       ],
       alarms: generateIndustrialAlarms('fanuc'),
       runtime: {
@@ -408,6 +409,7 @@ function mockFanucTelemetry() {
 
 function mockKukaTelemetry() {
   const now = new Date().toISOString()
+  const t = Date.now() / 1000
   return {
     type: 'industrial_state',
     brand: 'kuka',
@@ -417,12 +419,12 @@ function mockKukaTelemetry() {
       timestamp: now,
       pose: generateIndustrialPose(),
       joints: [
-        { j: 1, load_pct: 35, temp_c: 36, current_a: 2.0, speed_rpm: 100, health_score: 90 },
-        { j: 2, load_pct: 55, temp_c: 42, current_a: 3.0, speed_rpm: 80, health_score: 82 },
-        { j: 3, load_pct: 40, temp_c: 37, current_a: 2.2, speed_rpm: 110, health_score: 88 },
-        { j: 4, load_pct: 22, temp_c: 32, current_a: 1.1, speed_rpm: 160, health_score: 95 },
-        { j: 5, load_pct: 18, temp_c: 30, current_a: 0.8, speed_rpm: 200, health_score: 97 },
-        { j: 6, load_pct: 12, temp_c: 28, current_a: 0.5, speed_rpm: 220, health_score: 99 },
+        { j: 1, angle_rad: Math.sin(t * 0.4) * 0.7, load_pct: 35, temp_c: 36, current_a: 2.0, speed_rpm: 100, health_score: 90 },
+        { j: 2, angle_rad: 0.2 + Math.sin(t * 0.6) * 0.5, load_pct: 55, temp_c: 42, current_a: 3.0, speed_rpm: 80, health_score: 82 },
+        { j: 3, angle_rad: -0.3 + Math.sin(t * 0.8) * 0.4, load_pct: 40, temp_c: 37, current_a: 2.2, speed_rpm: 110, health_score: 88 },
+        { j: 4, angle_rad: Math.sin(t * 1.0) * 0.5, load_pct: 22, temp_c: 32, current_a: 1.1, speed_rpm: 160, health_score: 95 },
+        { j: 5, angle_rad: Math.sin(t * 1.2) * 0.4, load_pct: 18, temp_c: 30, current_a: 0.8, speed_rpm: 200, health_score: 97 },
+        { j: 6, angle_rad: Math.sin(t * 1.4) * 0.3, load_pct: 12, temp_c: 28, current_a: 0.5, speed_rpm: 220, health_score: 99 },
       ],
       alarms: generateIndustrialAlarms('kuka'),
       runtime: {
@@ -443,6 +445,7 @@ function mockKukaTelemetry() {
 
 function mockEstunTelemetry() {
   const now = new Date().toISOString()
+  const t = Date.now() / 1000
   return {
     type: 'industrial_state',
     brand: 'estun',
@@ -452,12 +455,12 @@ function mockEstunTelemetry() {
       timestamp: now,
       pose: generateIndustrialPose(),
       joints: [
-        { j: 1, load_pct: 28, temp_c: 34, current_a: 1.5, speed_rpm: 90, health_score: 93 },
-        { j: 2, load_pct: 42, temp_c: 39, current_a: 2.3, speed_rpm: 75, health_score: 85 },
-        { j: 3, load_pct: 35, temp_c: 36, current_a: 1.9, speed_rpm: 100, health_score: 90 },
-        { j: 4, load_pct: 20, temp_c: 31, current_a: 0.9, speed_rpm: 140, health_score: 96 },
-        { j: 5, load_pct: 15, temp_c: 29, current_a: 0.6, speed_rpm: 170, health_score: 98 },
-        { j: 6, load_pct: 10, temp_c: 27, current_a: 0.4, speed_rpm: 200, health_score: 99 },
+        { j: 1, angle_rad: Math.sin(t * 0.45) * 0.6, load_pct: 28, temp_c: 34, current_a: 1.5, speed_rpm: 90, health_score: 93 },
+        { j: 2, angle_rad: 0.15 + Math.sin(t * 0.65) * 0.4, load_pct: 42, temp_c: 39, current_a: 2.3, speed_rpm: 75, health_score: 85 },
+        { j: 3, angle_rad: -0.25 + Math.sin(t * 0.85) * 0.35, load_pct: 35, temp_c: 36, current_a: 1.9, speed_rpm: 100, health_score: 90 },
+        { j: 4, angle_rad: Math.sin(t * 1.05) * 0.45, load_pct: 20, temp_c: 31, current_a: 0.9, speed_rpm: 140, health_score: 96 },
+        { j: 5, angle_rad: Math.sin(t * 1.25) * 0.35, load_pct: 15, temp_c: 29, current_a: 0.6, speed_rpm: 170, health_score: 98 },
+        { j: 6, angle_rad: Math.sin(t * 1.45) * 0.3, load_pct: 10, temp_c: 27, current_a: 0.4, speed_rpm: 200, health_score: 99 },
       ],
       alarms: generateIndustrialAlarms('estun'),
       runtime: {

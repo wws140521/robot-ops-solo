@@ -6,6 +6,7 @@
 // ─── 单关节遥测 ─────────────────────────────────
 export interface JointTelemetry {
   j: number;              // 关节号 1-6
+  angle_rad?: number;     // 当前关节角（弧度）· 驱动 3D 模型旋转
   load_pct: number;       // 转矩负载率 %（0-200）
   temp_c?: number;        // 电机温度 ℃
   current_a?: number;     // 伺服电流 A
