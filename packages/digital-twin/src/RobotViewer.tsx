@@ -175,7 +175,7 @@ function RobotBody({ state, collision }: { state: UnifiedRobotState; collision: 
 
   return (
     <>
-      {state.brand === 'unitree' && <G1Humanoid position={pos} rotation={rot} joints={state.joints} scale={1.2} />}
+      {state.brand === 'unitree' && <G1Humanoid position={pos} rotation={rot} joints={state.joints} scale={1.0} />}
       {state.brand === 'keenon' && <PeanutBot position={pos} rotation={rot} />}
       {collision && <CollisionRing position={pos} />}
     </>
