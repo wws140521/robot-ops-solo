@@ -27,8 +27,8 @@
 - ✅ 工业专有类型 · [industrial.ts](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/adapter-kit/src/types/industrial.ts) · JointTelemetry/IndustrialAlarm/IndustrialRuntime/ProtocolConfig
 
 #### 协议层
-- ✅ WebSocket 客户端 · [ws-client.ts](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/adapter-kit/src/protocol/ws-client.ts) · 指数退避重连 + 心跳
-- ✅ MQTT 客户端 · [mqtt-client.ts](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/adapter-kit/src/protocol/mqtt-client.ts) · 订阅 industrial/robot/+/telemetry
+- ✅ WebSocket 客户端 · [ws-client.ts](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/adapter-kit/src/protocol/ws-client.ts) · 指数退避重连 + 心跳 + 连接生命周期埋点
+- ✅ MQTT 客户端 · [mqtt-client.ts](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/adapter-kit/src/protocol/mqtt-client.ts) · 订阅 industrial/robot/+/telemetry + ota/+/status
 
 #### 测试覆盖
 - ✅ 宇树适配器测试 · adapter-unitree.test.ts
@@ -47,13 +47,14 @@
 - ✅ 模型注册表 · [robots/index.ts](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/digital-twin/src/robots/index.ts) · renderRobotModel(brand) 按品牌分发
 
 #### 场景组件
-- ✅ 地面网格 · Floor.tsx · SLAM 坐标系可视化
+- ✅ 地面网格 · Floor.tsx · SLAM 坐标系可视化 · CSS 变量桥接
 - ✅ SLAM 建图叠加 · SlamMap.tsx · 障碍物渲染
-- ✅ 碰撞检测 · collision.ts · AABB 包围盒（软检测，仅视觉告警）
+- ✅ 碰撞检测 · collision.ts · AABB 包围盒 + 穿模检测埋点
+- ✅ 3D 场景色彩钩子 · useScenePalette.ts · CSS 变量 → Three.js 色值桥接
 - ✅ 轨迹线 · TrajectoryLine.tsx · 历史路径渲染
 - ✅ 发光轨迹 · GlowTrajectory.tsx · 渐变尾迹效果
-- ✅ 状态标签 · StatusBadge.tsx · 3D 空间悬浮文字
-- ✅ 3D 查看器主组件 · RobotViewer.tsx · Canvas + 相机 + 灯光 + 低性能降级
+- ✅ 状态标签 · StatusBadge.tsx · 3D 空间悬浮文字 · CSS 变量主题适配
+- ✅ 3D 查看器主组件 · RobotViewer.tsx · Canvas + 相机 + 灯光 + 低性能降级 + 场景色板
 
 ### sop-editor · SOP 低代码流程编排
 
@@ -89,6 +90,7 @@
 - ✅ 3D 孪生大屏 · TwinPage.tsx · 按 brand 切换 FanucArm/KukaArm/G1Dog/PeanutBot + 轨迹回放
 - ✅ 告警中心 · AlertsPage.tsx · 级别筛选 + 搜索 + 播报历史 · 工业告警 raw_code 徽标 + 中文描述
 - ✅ 租户管理 · TenantsPage.tsx · 贴牌换肤 + 异步数据 + 主题切换
+- ✅ OTA 升级管理 · OtaPage.tsx · 设备状态卡片 + 进度条 + 前置校验 + 批量升级 + 模拟失败 + 操作日志
 - ✅ 登录页 · LoginPage.tsx · Supabase Auth + 记住账号 + mock 降级
 - ✅ 注册页 · SignUp.tsx · 租户标识写入 user_metadata
 
@@ -96,11 +98,12 @@
 - ✅ 机器人状态 · robotStore.ts · updateRobot/setOffline · onlineCount 派生 · 工业扩展字段
 - ✅ 告警队列 · alertStore.ts · addAlert/clearAlerts · unreadCount · 工业 raw_code
 - ✅ 语音播报 · speakStore.ts · setSpeak + history 播报历史
-- ✅ 租户状态 · tenantStore.ts · setTenant + data-tenant 属性驱动贴牌换肤
+- ✅ 租户状态 · tenantStore.ts · setTenant + data-tenant 属性驱动贴牌换肤 + applyPrimaryColor 品牌色派生
+- ✅ OTA 升级状态 · otaStore.ts · 6 态状态机 + 前置校验 + mock 降级引擎 + 后端 9 态→前端 6 态映射
 - ✅ 主题状态 · themeStore.ts · 深/浅主题 · localStorage 持久化
 
 #### 服务层
-- ✅ WS/MQTT 中枢 · wsHub.ts · 商用分流(state/alert/speak) + 工业分流(industrial_state/industrial_alert) + MQTT 连接 + AI 联动
+- ✅ WS/MQTT 中枢 · wsHub.ts · 商用分流 + 工业分流 + OTA 分流(ota_status) + MQTT 连接 + AI 联动
 - ✅ AI SaaS 对接 · aiSaaSApi.ts · fetchAIInsight/fetchAINaturalQuery · 未配置走 mock 中文摘要
 - ✅ Supabase 客户端 · supabase.ts · isSupabaseEnabled 降级标志
 - ✅ 机器人持久化 · robotStorage.ts · writeRobotState + getRobotTrajectory
@@ -111,7 +114,7 @@
 - ✅ Webhook 推送 · webhook.ts · 企微/钉钉/飞书
 
 #### 组件层
-- ✅ 侧边导航 · Sidebar.tsx · 7 路由 NavLink + WS 三态状态角标 + 主题切换
+- ✅ 侧边导航 · Sidebar.tsx · 8 路由 NavLink + WS 三态状态角标 + 主题切换
 - ✅ 贴牌顶栏 · TenantBranding.tsx · 租户 Logo + 品牌色 + 当前用户信息
 - ✅ 语音气泡 · SpeakBubble.tsx + .css · 3D 场景上方悬浮 · TTS 朗读联动
 - ✅ AI 运维助手面板 · AIInsightPanel.tsx · 中文告警摘要 + 排查建议 + 健康分/寿命预测
@@ -134,10 +137,46 @@
 
 ### 根目录
 
-- ✅ Mock WS 服务器 · mock-ws-server.js · 3 端口分流（:8080 商用 / :8081 商用+告警 / :8082 工业轮流广播）
+- ✅ Mock WS 服务器 · mock-ws-server.js · 3 端口分流 + OTA 状态轮播（:8080 商用 / :8081 商用+告警 / :8082 工业轮流 + OTA 8s/帧）
 - ✅ 根 scripts · dev/build/test/lint/mock/dev:industrial/test:adapter-kit/build:all
 
 ## 变更日志
+
+### 2026-08-28 · 埋点日志节流 + WS 孤儿连接修复 + Mock 状态推进解耦
+
+- ✅ adapter-kit 商用适配器日志节流（adaptIncoming 入口 1/50 帧采样 + 宇树/擎朗输入输出 1/50 采样），修复 ~17 条/秒刷满 Console 缓冲区淹没低频埋点的问题
+- ✅ adapter-unitree.ts 轴数异常 warn 只报一次（mock G1 固定 4 关节属持续性偏差，逐帧 warn 以 10Hz 刷屏）
+- ✅ supabase.ts getCurrentTenantSlug 改用 getSession() 本地会话（原 getUser() 逐帧发起 /auth/v1/user 请求，未登录时产生 ~30 req/s 无效 401）
+- ✅ robotStorage/alertStorage 未登录跳过 Supabase 写入 + 一次性提示（原逐帧 RLS 拒绝产生 writeRobotState error 洪泛）
+- ✅ ws-client.ts 新增 disposed 标志：disconnect() 后 onclose 不再触发重连，修复 StrictMode 双挂载 + 页面刷新场景下孤儿连接复活
+- ✅ mock-ws-server.js G1/Peanut 状态推进改为全局单 ticker + 广播，与连接数解耦（原每连接独立 interval 推进全局电量，实测 5 连接电量 5 倍速递减导致签名节流失效）
+- ✅ 浏览器端全链路埋点验证通过：ws-client 连接 → 适配器入口/出口 → wsHub 分流（商用/工业/OTA）→ robotStore 更新 → sendCommand 指令下发（含破坏性操作双击确认）→ 播报/碰撞埋点
+
+### 2026-08-28 · 3D 网格闪烁修复
+
+- ✅ RobotViewer.tsx 提取 SceneEnvironment memo 组件，静态场景（灯光/地面/网格/阴影）仅依赖 palette+showMap，WS 高频帧(~10Hz)不再重建 3D 几何
+- ✅ Grid 从 y=0 抬升至 y=0.005（group position），与 Floor(y=0) 拉开深度间距，消除 z-fighting
+- ✅ 移除 drei infiniteGrid 属性（原 shader 跟随相机每帧重算导致拖拽时视觉抖动）
+- ✅ 降低 Grid 线宽：cellThickness 0.5→0.08、sectionThickness 1→0.15，减少深度缓冲竞争
+- ✅ 鼠标拖拽动态验证通过：连续拖拽 30 帧网格线稳定可见无闪烁
+
+### 2026-08-26 · OTA 升级模块 + 深色主题修复 + 数字孪生场景适配 + 软著合规改造
+
+- ✅ 新增 OTA 升级管理页 OtaPage.tsx（设备状态卡片 + 进度条 + 前置校验 + 批量升级 + 模拟失败 + 操作日志）
+- ✅ 新增 OTA 状态管理 otaStore.ts（6 态状态机 + 前置校验 + mock 降级引擎 + 后端 9 态→前端 6 态映射）
+- ✅ mqtt-client.ts 新增 roboticsops/ota/+/status 订阅 + OTA 状态消息分流
+- ✅ wsHub.ts 新增 ota_status WS 消息分流 + connectMqtt 接入 OTA 回调
+- ✅ App.tsx 新增 /ota 路由 + Sidebar 新增 OTA 导航项
+- ✅ mock-ws-server.js 新增 OTA 状态轮播（8s/帧，3 台设备×6 态循环）
+- ✅ 修复深色主题 --text-muted / --viz-* / --primary-color 变量缺失（影响 8+ 组件）
+- ✅ tenantStore + ThemeProvider 新增 applyPrimaryColor 同步 8 个品牌色派生变量
+- ✅ 品牌色统一恢复霓虹绿 #39ff8b（ThemeProvider/TenantBranding/TenantLogo/SignUp）
+- ✅ TenantLogo/StatusBadge/AlertCard/NodeEditButton/SignUp 消除硬编码颜色，全部走 CSS 变量
+- ✅ 数字孪生 3D 场景深色适配：新增 --scene-* 变量 + useScenePalette hook 桥接 CSS→Three.js
+- ✅ P0 核心源码注释合规改造（13 文件 40 条注释补充日期+开发意图）
+- ✅ 新增 22 条 console.log/warn 调试埋点（adapter-kit/sop-editor/web-console/digital-twin）
+- ✅ 新增 doc/ 目录：CODE-RULES.md（软著合规规则 8 章 16 条）+ UI 风格文档 + 软著规则手册 + OTA 前端开发文档
+- ✅ 新增 mock_ota_demo.py + requirements-ota-mock.txt + OTA-README.md + 轻量OTA开发文档.md
 
 ### 2026-08-18 · 工业扩展完整实现 + 文档体系建立
 
