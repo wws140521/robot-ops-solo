@@ -38,14 +38,24 @@ function fallbackAlert(brand: string, raw: any, robotId: string): UnifiedAlert |
   return null
 }
 
+// 2026-08-28 出口埋点节流：mock 高频帧电量逐帧微变导致日志内容唯一、无法被 console 去重，
+// 逐帧打印会刷满缓冲区淹没低频埋点（OTA 8s/工业 5s/sendCommand）→ 仅在电量整数位或状态变化时打印
+const lastAdaptLogSig: Record<string, string> = {}
+// 2026-08-28 入口埋点同策略节流（帧计数采样），rawKeys 逐帧相同无追踪价值 → 仅每 50 帧采样一次
+const adaptEntryCount: Record<string, number> = {}
+
 // 2026-08-18 品牌工厂分发逻辑，未注册品牌走 fallback 不 throw
 export function adaptIncoming(
   brand: string,
   raw: any,
   robotId: string
 ): UnifiedRobotState {
-  // 2026-08-21 埋点：适配器入口，记录品牌+robotId 便于追踪数据流
-  console.log('[adapter] adaptIncoming 入口:', { brand, robotId, rawKeys: Object.keys(raw ?? {}) })
+  // 2026-08-21 埋点：适配器入口，记录品牌+robotId 便于追踪数据流（1/50 采样防刷屏）
+  const frameNo = (adaptEntryCount[robotId] ?? 0) + 1
+  adaptEntryCount[robotId] = frameNo
+  if (frameNo % 50 === 1) {
+    console.log('[adapter] adaptIncoming 入口:', { brand, robotId, rawKeys: Object.keys(raw ?? {}) })
+  }
   let state: UnifiedRobotState
   switch (brand) {
     case 'unitree':   state = adaptUnitree(raw, robotId); break
@@ -54,7 +64,11 @@ export function adaptIncoming(
     case 'pudutech':  state = adaptPudutech(raw, robotId); break
     default:          state = fallbackState(brand, raw, robotId); break
   }
-  console.log('[adapter] adaptIncoming 出口:', { brand, robotId, battery: state.batteryPct, status: state.status })
+  const sig = `${state.batteryPct | 0}:${state.status}`
+  if (lastAdaptLogSig[robotId] !== sig) {
+    lastAdaptLogSig[robotId] = sig
+    console.log('[adapter] adaptIncoming 出口:', { brand, robotId, battery: state.batteryPct, status: state.status })
+  }
   return state
 }
 

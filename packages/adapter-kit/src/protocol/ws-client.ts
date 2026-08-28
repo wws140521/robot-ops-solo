@@ -5,6 +5,9 @@ export class RobotWSClient {
   private heartbeatTimer?: number
   private reconnectAttempts = 0
   private readonly maxReconnect = 10
+  // 2026-08-28 主动断开标志：disconnect() 后 onclose 仍会触发，
+  // 若不拦截会 scheduleReconnect 复活孤儿连接 → mock 端状态被多连接加速推进（电量 5 倍速递减实测）
+  private disposed = false
 
   constructor(
     private url: string,
@@ -29,6 +32,7 @@ export class RobotWSClient {
       this.ws.onclose = () => {
         console.log('[ws-client] 连接关闭, 准备重连')
         this.onStatusChange?.(false)
+        if (this.disposed) return // 2026-08-28 主动断开不重连，防止孤儿连接复活
         this.scheduleReconnect()
       }
       this.ws.onerror = () => {
@@ -48,6 +52,7 @@ export class RobotWSClient {
   }
 
   disconnect() {
+    this.disposed = true // 2026-08-28 先置位再关闭，拦截 onclose 引发的重连
     clearTimeout(this.reconnectTimer)
     clearInterval(this.heartbeatTimer)
     this.ws?.close()

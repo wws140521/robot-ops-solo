@@ -14,11 +14,17 @@ interface KeenonRawMsg {
   }
 }
 
+// 2026-08-28 输入埋点节流：Peanut mock ~6.7Hz 逐帧打印会刷满 console 缓冲区，
+// 淹没 OTA(8s)/工业(5s) 等低频埋点 → 仅每 50 帧采样一次（约 7.5 秒一条）
+let peanutFrameCount = 0
+
 export function adaptKeenon(
   raw: KeenonRawMsg,
   robotId: string
 ): UnifiedRobotState {
-  console.log('[adapter-keenon] 输入:', { cmd: raw.cmd, battery: raw.payload.level, status: raw.payload.status, err: raw.payload.err })
+  if (++peanutFrameCount % 50 === 1) {
+    console.log('[adapter-keenon] 输入:', { cmd: raw.cmd, battery: raw.payload.level, status: raw.payload.status, err: raw.payload.err })
+  }
   const state: UnifiedRobotState = {
     robotId,
     brand: 'keenon',
@@ -35,7 +41,10 @@ export function adaptKeenon(
     errorCode: raw.payload.err,
     lastSeen: Date.now(),
   }
-  console.log('[adapter-keenon] 输出:', { robotId, battery: state.batteryPct, status: state.status, theta: state.position.theta })
+  // 2026-08-28 输出埋点复用同一采样计数，与输入埋点保持一致的 1/50 频率
+  if (peanutFrameCount % 50 === 1) {
+    console.log('[adapter-keenon] 输出:', { robotId, battery: state.batteryPct, status: state.status, theta: state.position.theta })
+  }
   return state
 }
 
