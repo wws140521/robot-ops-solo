@@ -97,10 +97,23 @@ function scanDirection(cx, cy, heading, lookAhead = 0.12) {
   return !blocked
 }
 
+// 2026-08-28 广播替代单连接发送：多客户端连接时逐帧 send 只发连接方，
+// 且全局电量若放在 connection 内 interval 会被 N 个连接 N 倍速推进（实测 5 连接电量 5 倍速狂掉）
+function broadcastG1(msg) {
+  const data = JSON.stringify(msg)
+  wssUnitree.clients.forEach((c) => { if (c.readyState === WebSocket.OPEN) c.send(data) })
+}
+
+// 2026-08-28 状态推进全局单 ticker：G1 状态机（位置/避障/电量/播报）与连接数解耦，
+// 无论多少客户端订阅，状态推进速度恒定（0.05/tick）
+let g1TickerStarted = false
+
 wssUnitree.on('connection', (ws) => {
   console.log('[mock] G1 client connected')
+  if (g1TickerStarted) return
+  g1TickerStarted = true
   const interval = setInterval(() => {
-    if (ws.readyState !== ws.OPEN) return
+    if (wssUnitree.clients.size === 0) return
 
     // 1. 计算目标方向（朝向当前航点）
     const target = WAYPOINTS[wpIdx]
@@ -113,10 +126,10 @@ wssUnitree.on('connection', (ws) => {
     if (distToTarget < 0.15) {
       // 到达 B 点（WAYPOINTS 第 6 号，y=-1.8 附近）触发播报
       if (wpIdx === 6 && !g1HasSpoken) {
-        ws.send(JSON.stringify({
+        broadcastG1({
           topic: '/speak',
           data: { text: '小心烫手～', volume: 0.8, timestamp: Date.now() },
-        }))
+        })
         g1HasSpoken = true
         console.log('[mock] 到达 B 点（出餐口），触发播报')
       }
@@ -230,7 +243,7 @@ wssUnitree.on('connection', (ws) => {
     const y = Math.round(g1Pos.y * 100) / 100
     const jointsAngle = Date.now() / 250
 
-    ws.send(JSON.stringify({
+    broadcastG1({
       topic: '/state',
       data: {
         percentage: Math.round(g1Battery),
@@ -243,20 +256,21 @@ wssUnitree.on('connection', (ws) => {
           knee_r: Math.abs(Math.sin(jointsAngle * 4 + Math.PI)) * 0.5,
         },
       },
-    }))
+    })
 
     // 阈值告警
     if (g1Battery <= 20 && g1LastAlertLevel > 20) {
-      ws.send(JSON.stringify({ topic: '/alert', data: { code: 'W_BATTERY_LOW', msg: '电量低于20%，建议回充' } }))
+      broadcastG1({ topic: '/alert', data: { code: 'W_BATTERY_LOW', msg: '电量低于20%，建议回充' } })
       g1LastAlertLevel = 20
     }
     if (g1Battery <= 10 && g1LastAlertLevel > 10) {
-      ws.send(JSON.stringify({ topic: '/alert', data: { code: 'E_BATTERY_CRITICAL', msg: '电量极低，已停止运动' } }))
+      broadcastG1({ topic: '/alert', data: { code: 'E_BATTERY_CRITICAL', msg: '电量极低，已停止运动' } })
       g1LastAlertLevel = 10
     }
   }, 100)
 
-  ws.on('close', () => { clearInterval(interval); console.log('[mock] G1 client disconnected') })
+  // 2026-08-28 ticker 全局常驻：任何客户端断开都不清 interval（最后一个断开时靠 clients.size===0 空转跳过）
+  ws.on('close', () => { console.log('[mock] G1 client disconnected') })
 })
 
 // ───────────────────────── 擎朗 Peanut（8081）─────────────────────────
@@ -266,10 +280,20 @@ let peanutPos = { x: -2.0, y: 0.5 }
 let peanutDir = 1
 const PEANUT_SPEED = 0.025
 
+// 2026-08-28 Peanut 与 G1 同策略：状态推进全局单 ticker + 广播，与连接数解耦
+function broadcastKeenon(msg) {
+  const data = JSON.stringify(msg)
+  wssKeenon.clients.forEach((c) => { if (c.readyState === WebSocket.OPEN) c.send(data) })
+}
+
+let peanutTickerStarted = false
+
 wssKeenon.on('connection', (ws) => {
   console.log('[mock] Peanut client connected')
+  if (peanutTickerStarted) return
+  peanutTickerStarted = true
   const interval = setInterval(() => {
-    if (ws.readyState !== ws.OPEN) return
+    if (wssKeenon.clients.size === 0) return
 
     // 安全的 X 方向往返，避开隔墙（x=4 栅格→世界 -1.0 附近是隔墙，所以上限只开到 -1.3）
     peanutPos.x += PEANUT_SPEED * peanutDir
@@ -279,7 +303,7 @@ wssKeenon.on('connection', (ws) => {
     peanutBattery = Math.max(0, peanutBattery - 0.03)
     if (peanutBattery <= 0) peanutBattery = 92
 
-    ws.send(JSON.stringify({
+    broadcastKeenon({
       cmd: 'state',
       payload: {
         level: Math.round(peanutBattery),
@@ -289,10 +313,10 @@ wssKeenon.on('connection', (ws) => {
         angle: peanutDir > 0 ? 0 : 180,
         status: 2,
       },
-    }))
+    })
   }, 150)
 
-  ws.on('close', () => { clearInterval(interval); console.log('[mock] Peanut client disconnected') })
+  ws.on('close', () => { console.log('[mock] Peanut client disconnected') })
 })
 
 // ───────────────────────── 工业机器人（8082）─────────────────────────
