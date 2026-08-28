@@ -1,6 +1,6 @@
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Grid, ContactShadows } from '@react-three/drei'
-import { memo, useRef } from 'react'
+import { OrbitControls, Grid, ContactShadows, AdaptiveDpr, AdaptiveEvents } from '@react-three/drei'
+import { memo, Suspense, useRef } from 'react'
 import * as THREE from 'three'
 import { G1Dog } from './robots/G1Dog'
 import { PeanutBot } from './robots/PeanutBot'
@@ -9,6 +9,7 @@ import { SlamMap } from './environment/SlamMap'
 import { isObstacle, getCellType, type CellType } from './environment/collision'
 import { GlowTrajectory } from './overlays/GlowTrajectory'
 import { StatusBadge } from './overlays/StatusBadge'
+import { HUDLabel } from './overlays/HUDLabel'
 import { useScenePalette } from './hooks/useScenePalette'
 import type { UnifiedRobotState } from 'robot-adapter-kit'
 
@@ -49,7 +50,17 @@ export function RobotViewer({ robotId, state, trajectory, showMap = true }: Robo
             避免 WS 高频帧（~10Hz）触发重建导致网格几何重绘闪烁 */}
         <SceneEnvironment palette={palette} showMap={showMap} />
 
-        {state && <RobotBody state={state} collision={collision} />}
+        {/* 2026-08-28 Suspense 包裹机器人 —— 为后续接入 useGLTF/URDF 异步加载预留兜底 */}
+        <Suspense fallback={null}>
+          {state && <RobotBody state={state} collision={collision} />}
+        </Suspense>
+
+        {state && <HUDLabel
+          position={[state.position.x, 2.0, state.position.y]}
+          robot={state}
+          accentColor={palette.accent}
+          primaryColor={palette.primary}
+        />}
         {trajectory && trajectory.length > 1 && <GlowTrajectory points={trajectory} color={palette.accent} />}
         {state && <GroundRing position={[state.position.x, 0, state.position.y]} color={palette.accent} />}
 
@@ -62,6 +73,10 @@ export function RobotViewer({ robotId, state, trajectory, showMap = true }: Robo
           minDistance={2}
           maxDistance={18}
         />
+
+        {/* 2026-08-28 性能降级：低配设备自动降低像素比 + 减少事件监听 */}
+        <AdaptiveDpr pixelated />
+        <AdaptiveEvents />
       </Canvas>
     </div>
   )
@@ -113,7 +128,8 @@ const SceneEnvironment = memo(function SceneEnvironment({
         decay={2}
       />
 
-      <Floor color={palette.floor} />
+      {/* 2026-08-28 Floor 升级 MeshReflectorMaterial，反射强度 1.2 提供金属质感 */}
+      <Floor color={palette.floor} reflectivity={1.2} />
 
       {/* 2026-08-28 Grid 抬升 0.005 + 移除 infiniteGrid + 降低线宽 → 消除鼠标拖拽时网格闪烁 */}
       <group position={[0, 0.005, 0]}>
