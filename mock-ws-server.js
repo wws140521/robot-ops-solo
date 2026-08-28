@@ -250,6 +250,41 @@ wssUnitree.on('connection', (ws) => {
         voltage: 54.2 - (85 - g1Battery) * 0.1,
         position: { x, y, yaw: g1Heading },
         joints: {
+          // ─── 腰部 3（URDF: waist_yaw→roll→pitch） ───
+          waist_yaw_joint: Math.sin(jointsAngle * 0.5) * 0.15,
+          waist_roll_joint: Math.sin(jointsAngle * 0.7) * 0.1,
+          waist_pitch_joint: Math.sin(jointsAngle * 0.8) * 0.1,
+          // ─── 左腿 6 ───
+          left_hip_pitch_joint: Math.sin(jointsAngle * 2) * 0.3,
+          left_hip_roll_joint: Math.sin(jointsAngle * 1.5) * 0.15,
+          left_hip_yaw_joint: Math.sin(jointsAngle * 1) * 0.1,
+          left_knee_joint: Math.abs(Math.sin(jointsAngle * 2)) * 0.5,
+          left_ankle_pitch_joint: Math.sin(jointsAngle * 3) * 0.1,
+          left_ankle_roll_joint: Math.sin(jointsAngle * 2.5) * 0.05,
+          // ─── 右腿 6 ───
+          right_hip_pitch_joint: Math.sin(jointsAngle * 2 + Math.PI) * 0.3,
+          right_hip_roll_joint: Math.sin(jointsAngle * 1.5 + Math.PI) * 0.15,
+          right_hip_yaw_joint: Math.sin(jointsAngle * 1 + Math.PI) * 0.1,
+          right_knee_joint: Math.abs(Math.sin(jointsAngle * 2 + Math.PI)) * 0.5,
+          right_ankle_pitch_joint: Math.sin(jointsAngle * 3 + Math.PI) * 0.1,
+          right_ankle_roll_joint: Math.sin(jointsAngle * 2.5 + Math.PI) * 0.05,
+          // ─── 左臂 7 ───
+          left_shoulder_pitch_joint: Math.sin(jointsAngle * 1.2) * 0.4,
+          left_shoulder_roll_joint: Math.sin(jointsAngle * 0.9) * 0.2,
+          left_shoulder_yaw_joint: Math.sin(jointsAngle * 0.8) * 0.15,
+          left_elbow_joint: Math.abs(Math.sin(jointsAngle * 1.2)) * 0.6,
+          left_wrist_roll_joint: Math.sin(jointsAngle * 1.1) * 0.1,
+          left_wrist_pitch_joint: Math.sin(jointsAngle * 1.0) * 0.08,
+          left_wrist_yaw_joint: Math.sin(jointsAngle * 0.7) * 0.15,
+          // ─── 右臂 7 ───
+          right_shoulder_pitch_joint: Math.sin(jointsAngle * 1.2 + Math.PI) * 0.4,
+          right_shoulder_roll_joint: Math.sin(jointsAngle * 0.9 + Math.PI) * 0.2,
+          right_shoulder_yaw_joint: Math.sin(jointsAngle * 0.8 + Math.PI) * 0.15,
+          right_elbow_joint: Math.abs(Math.sin(jointsAngle * 1.2 + Math.PI)) * 0.6,
+          right_wrist_roll_joint: Math.sin(jointsAngle * 1.1 + Math.PI) * 0.1,
+          right_wrist_pitch_joint: Math.sin(jointsAngle * 1.0 + Math.PI) * 0.08,
+          right_wrist_yaw_joint: Math.sin(jointsAngle * 0.7 + Math.PI) * 0.15,
+          // 兼容旧版 key（G1Dog 使用）
           hip_l: Math.sin(jointsAngle * 4) * 0.3,
           hip_r: Math.sin(jointsAngle * 4 + Math.PI) * 0.3,
           knee_l: Math.abs(Math.sin(jointsAngle * 4)) * 0.5,

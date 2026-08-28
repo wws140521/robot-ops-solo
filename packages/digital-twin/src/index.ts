@@ -1,4 +1,5 @@
 export { RobotViewer } from './RobotViewer'
+export { G1Humanoid } from './robots/G1Humanoid'
 export { G1Dog } from './robots/G1Dog'
 export { PeanutBot } from './robots/PeanutBot'
 export { FanucArm } from './robots/FanucArm'

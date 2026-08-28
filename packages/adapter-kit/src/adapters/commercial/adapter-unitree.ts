@@ -30,12 +30,12 @@ export function adaptUnitree(
   }
   const batteryLow = (raw.data.percentage ?? 100) < 10
   // TODO: 多轴联动时 joint 角速度需单独换算，当前只取静态值
-  // 2026-08-28 轴数异常 warn 只报一次：mock G1 固定发 4 关节（持续性偏差），
+  // 2026-08-28 轴数异常 warn 只报一次：mock G1 固定发 29+ 关节（持续性偏差），
   // 逐帧 warn 会以 ~10Hz 刷屏，淹没 OTA(8s)/工业(5s) 等低频埋点
-  if (raw.data.joints && Object.keys(raw.data.joints).length !== 6) {
+  if (raw.data.joints && Object.keys(raw.data.joints).length < 29) {
     if (!g1JointWarned) {
       g1JointWarned = true
-      console.warn('[adapter] 宇树轴数异常:', Object.keys(raw.data.joints).length, '期望 6')
+      console.warn('[adapter] 宇树轴数异常:', Object.keys(raw.data.joints).length, '期望 ≥29')
     }
   }
 

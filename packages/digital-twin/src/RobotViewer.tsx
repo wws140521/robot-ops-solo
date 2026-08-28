@@ -2,7 +2,7 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Grid, ContactShadows, AdaptiveDpr, AdaptiveEvents } from '@react-three/drei'
 import { memo, Suspense, useRef } from 'react'
 import * as THREE from 'three'
-import { G1Dog } from './robots/G1Dog'
+import { G1Humanoid } from './robots/G1Humanoid'
 import { PeanutBot } from './robots/PeanutBot'
 import { Floor } from './environment/Floor'
 import { SlamMap } from './environment/SlamMap'
@@ -175,7 +175,7 @@ function RobotBody({ state, collision }: { state: UnifiedRobotState; collision: 
 
   return (
     <>
-      {state.brand === 'unitree' && <G1Dog position={pos} rotation={rot} joints={state.joints} />}
+      {state.brand === 'unitree' && <G1Humanoid position={pos} rotation={rot} joints={state.joints} scale={1.2} />}
       {state.brand === 'keenon' && <PeanutBot position={pos} rotation={rot} />}
       {collision && <CollisionRing position={pos} />}
     </>
