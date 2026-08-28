@@ -1,6 +1,6 @@
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Grid, ContactShadows } from '@react-three/drei'
-import { useRef } from 'react'
+import { memo, useRef } from 'react'
 import * as THREE from 'three'
 import { G1Dog } from './robots/G1Dog'
 import { PeanutBot } from './robots/PeanutBot'
@@ -45,70 +45,9 @@ export function RobotViewer({ robotId, state, trajectory, showMap = true }: Robo
         <color attach="background" args={[palette.bgBottom]} />
         <fog attach="fog" args={[palette.fog, 14, 32]} />
 
-        <ambientLight intensity={0.75} color="#ffffff" />
-
-        <directionalLight
-          position={[6, 10, 6]}
-          intensity={1.6}
-          castShadow
-          shadow-mapSize={[2048, 2048]}
-          shadow-camera-near={0.5}
-          shadow-camera-far={40}
-          shadow-camera-left={-12}
-          shadow-camera-right={12}
-          shadow-camera-top={12}
-          shadow-camera-bottom={-12}
-          shadow-bias={-0.0004}
-          color="#ffffff"
-        />
-
-        <pointLight
-          position={[-5, 3, -3]}
-          intensity={0.6}
-          color={palette.accent}
-          distance={14}
-          decay={2}
-        />
-        <pointLight
-          position={[4, 2, 4]}
-          intensity={0.5}
-          color={palette.primary}
-          distance={12}
-          decay={2}
-        />
-
-        <Floor color={palette.floor} />
-        {showMap && (
-          <SlamMap
-            wallPerimColor={palette.wallPerim}
-            wallInnerColor={palette.wallInner}
-            wallPerimEmissive={palette.wallPerimEmissive}
-            wallInnerEmissive={palette.wallInnerEmissive}
-          />
-        )}
-
-        <Grid
-          args={[28, 28]}
-          cellSize={0.5}
-          cellThickness={0.5}
-          cellColor={palette.gridCell}
-          sectionSize={2}
-          sectionThickness={1}
-          sectionColor={palette.gridSection}
-          fadeDistance={24}
-          fadeStrength={1.5}
-          infiniteGrid
-        />
-
-        <ContactShadows
-          position={[0, 0.012, 0]}
-          opacity={0.25}
-          scale={18}
-          blur={2.4}
-          far={6}
-          resolution={1024}
-          color={palette.shadow}
-        />
+        {/* 2026-08-28 静态场景元素 memo 化：灯光/地面/网格/阴影/墙体仅依赖 palette+showMap，
+            避免 WS 高频帧（~10Hz）触发重建导致网格几何重绘闪烁 */}
+        <SceneEnvironment palette={palette} showMap={showMap} />
 
         {state && <RobotBody state={state} collision={collision} />}
         {trajectory && trajectory.length > 1 && <GlowTrajectory points={trajectory} color={palette.accent} />}
@@ -127,6 +66,92 @@ export function RobotViewer({ robotId, state, trajectory, showMap = true }: Robo
     </div>
   )
 }
+
+// 2026-08-28 提取静态场景为独立 memo 组件：
+// - 移除 infiniteGrid（drei 无限网格 shader 随相机每帧重算，拖拽时视觉抖动）
+// - Grid 抬升 y=0.005 避免与 Floor(y=0) z-fighting
+// - 降低线宽减少深度缓冲竞争
+// - memo 包裹避免 WS 帧触发重建
+const SceneEnvironment = memo(function SceneEnvironment({
+  palette,
+  showMap,
+}: {
+  palette: ReturnType<typeof useScenePalette>
+  showMap: boolean
+}) {
+  return (
+    <>
+      <ambientLight intensity={0.75} color="#ffffff" />
+
+      <directionalLight
+        position={[6, 10, 6]}
+        intensity={1.6}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-near={0.5}
+        shadow-camera-far={40}
+        shadow-camera-left={-12}
+        shadow-camera-right={12}
+        shadow-camera-top={12}
+        shadow-camera-bottom={-12}
+        shadow-bias={-0.0004}
+        color="#ffffff"
+      />
+
+      <pointLight
+        position={[-5, 3, -3]}
+        intensity={0.6}
+        color={palette.accent}
+        distance={14}
+        decay={2}
+      />
+      <pointLight
+        position={[4, 2, 4]}
+        intensity={0.5}
+        color={palette.primary}
+        distance={12}
+        decay={2}
+      />
+
+      <Floor color={palette.floor} />
+
+      {/* 2026-08-28 Grid 抬升 0.005 + 移除 infiniteGrid + 降低线宽 → 消除鼠标拖拽时网格闪烁 */}
+      <group position={[0, 0.005, 0]}>
+        <Grid
+          args={[28, 28]}
+          cellSize={0.5}
+          cellThickness={0.08}
+          cellColor={palette.gridCell}
+          sectionSize={2}
+          sectionThickness={0.15}
+          sectionColor={palette.gridSection}
+          fadeDistance={24}
+          fadeStrength={1.5}
+          infiniteGrid={false}
+        />
+      </group>
+
+      {showMap && (
+        <SlamMap
+          wallPerimColor={palette.wallPerim}
+          wallInnerColor={palette.wallInner}
+          wallPerimEmissive={palette.wallPerimEmissive}
+          wallInnerEmissive={palette.wallInnerEmissive}
+        />
+      )}
+
+      <ContactShadows
+        position={[0, 0.012, 0]}
+        opacity={0.25}
+        scale={18}
+        blur={2.4}
+        far={6}
+        resolution={1024}
+        color={palette.shadow}
+      />
+    </>
+  )
+})
 
 function RobotBody({ state, collision }: { state: UnifiedRobotState; collision: boolean }) {
   const pos: [number, number, number] = [state.position.x, 0, state.position.y]
