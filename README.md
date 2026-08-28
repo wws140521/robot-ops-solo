@@ -374,16 +374,32 @@ pnpm test:adapter-kit    # adapter-kit 全部测试（商用 + 工业 36 个用�
 pnpm build:all           # 递归构建所有包
 ```
 
-## 测试账号
+## 登录账号
 
-> 以下账号已注册在 Supabase 云端，可直接登录使用。
+### 两种运行模式
 
-| 邮箱 | 密码 | 租户标识 | 租户名称 |
-|------|------|---------|---------|
-| test@example.com | testpass123 | testco | Test Company |
-| test_industrial@test.com | Test123456 | default | 工业扩展验证账号 |
+| 模式 | 说明 | 登录方式 |
+|------|------|---------|
+| **Mock 模式**（未配置 Supabase） | 全量功能可用，数据走本地 localStorage + mock-ws-server | 无需登录，直接访问 `/` 进入 |
+| **Supabase 模式**（已配置 `VITE_SUPABASE_URL`） | 云端鉴权 + 多租户隔离 + 实时告警推送 | 账号密码登录 / 魔法链接免密登录 |
 
-登录页勾选"记住账号"可将凭据保存在本地 localStorage，下次自动填充。
+### Supabase 测试账号
+
+> ⚠️ **2026-08-28 数据优化**：已对数据库进行写入节流（5 秒/次）+ 自动清理（30 天过期）+ 告警去重。
+> 旧项目因 500MB 免费配额已满进入只读模式，需新建 Supabase 项目并重新初始化。
+>
+> 新账号创建步骤：
+> 1. 新建 Supabase 项目 → 执行 `supabase/migrations/001_init.sql` → `004_data_retention_and_auth_fix.sql`
+> 2. **Authentication → Providers → Email → 关闭 "Confirm email"**（未配置 SMTP 无法发邮件）
+> 3. **Authentication → Users → Add new user** 创建以下账号
+
+| 邮箱 | 密码 | 租户标识 | 租户名称 | 用途 |
+|------|------|---------|---------|------|
+| test@example.com | 见下方说明 | testco | Test Company | 商用机器人（宇树/Keenon）验证 |
+| test_industrial@test.com | 见下方说明 | default | 工业扩展验证账号 | 工业机器人（FANUC/KUKA/ESTUN）+ OTA 验证 |
+
+> 💡 密码在 Supabase Dashboard 创建账号时自行设定，然后更新到此表格中。
+> 💡 登录页勾选"记住账号"可将凭据保存在本地 localStorage，下次自动填充。
 
 ## 环境变量
 

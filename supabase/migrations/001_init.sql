@@ -45,6 +45,11 @@ create index if not exists idx_robots_brand  on robots(brand);
 
 -- ============================================================
 -- 3. robot_states 表（实时状态快照，时序数据）
+-- 优化说明：
+--   1. raw_msg 列保留但不再写入（体积大，调试用，改用结构化字段）
+--   2. joints 列保留但不再写入（实时 3D 由 robotStore 消费，历史轨迹不需要）
+--   3. 写入节流：每台机器人每 5 秒写一条（见 robotStorage.ts）
+--   4. 自动清理：pg_cron 每天删除 30 天前数据（见 004 迁移）
 -- ============================================================
 create table if not exists robot_states (
   id            bigserial primary key,
@@ -54,10 +59,10 @@ create table if not exists robot_states (
   voltage       numeric(5,2),
   online        boolean default true,
   position      jsonb,                      -- {"x":1.2,"y":3.4,"theta":0.5}
-  joints        jsonb,                      -- {"hip":0.1,"knee":-0.2}
+  joints        jsonb,                      -- 保留列，不再写入（实时 3D 用 robotStore）
   status        text,                       -- idle / moving / working / error
   error_code    text,
-  raw_msg       jsonb,                      -- 原始 WS 消息（调试用）
+  raw_msg       jsonb,                      -- 保留列，不再写入（体积大，改用结构化字段）
   created_at    timestamptz default now()
 );
 

@@ -3,10 +3,16 @@
 import { supabase, isSupabaseEnabled, getCurrentTenantSlug } from './supabase'
 import type { UnifiedAlert } from 'robot-adapter-kit'
 
-// 2026-08-28 未登录跳过提示只打一次，与 writeRobotState 同策略（持续性状态不逐帧报错）
+// ─── 告警去重：相同 robot_id + code 在 30 秒内只写一次 ──────────────────
+// 避免机器人持续报同一错误时数据库被重复告警刷满
+// 例如 low battery 每帧都触发 → 30 秒内只写一条
+const alertDedupe = new Map<string, number>() // key → last write timestamp
+const ALERT_DEDUPE_WINDOW_MS = 30_000 // 30 秒
+
+// 未登录跳过提示只打一次
 let skippedAlertWarned = false
 
-// 写入告警（wsHub 收到 /alert 帧后调用）
+// 写入告警 —— 带 30 秒去重
 export async function writeAlert(alert: UnifiedAlert) {
   if (!isSupabaseEnabled) return
 
@@ -18,6 +24,15 @@ export async function writeAlert(alert: UnifiedAlert) {
     }
     return
   }
+
+  // 去重检查
+  const dedupeKey = `${alert.robotId}|${alert.code}|${tenantSlug}`
+  const now = Date.now()
+  const lastAlert = alertDedupe.get(dedupeKey)
+  if (lastAlert && now - lastAlert < ALERT_DEDUPE_WINDOW_MS) {
+    return // 重复告警，跳过
+  }
+  alertDedupe.set(dedupeKey, now)
 
   const { error } = await supabase!.from('alerts').insert({
     robot_id: alert.robotId,

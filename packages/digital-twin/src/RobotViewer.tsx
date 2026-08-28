@@ -1,5 +1,5 @@
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Grid, ContactShadows, AdaptiveDpr, AdaptiveEvents, Environment } from '@react-three/drei'
+import { OrbitControls, Grid, ContactShadows, AdaptiveDpr, AdaptiveEvents } from '@react-three/drei'
 import { memo, Suspense, useRef } from 'react'
 import * as THREE from 'three'
 import { G1Humanoid } from './robots/G1Humanoid'
@@ -20,10 +20,24 @@ interface RobotViewerProps {
   showMap?: boolean
 }
 
-export function RobotViewer({ robotId, state, trajectory, showMap = true }: RobotViewerProps) {
+export function RobotViewer({ state, trajectory, showMap = true }: RobotViewerProps) {
   const palette = useScenePalette()
-  const collision = state ? isObstacle(state.position.x, state.position.y) : false
-  const cellType: CellType | null = state ? getCellType(state.position.x, state.position.y) : null
+
+  // 用 ref 缓存最新 state，防止短暂 falsy 导致 RobotBody 卸载
+  // 当 WS 重连、碰撞检测、电量临界等情况 state 短暂变为 undefined/null 时，
+  // 使用上一个有效状态继续渲染，避免机器人闪烁为蓝色 wireframe
+  const lastValidStateRef = useRef<UnifiedRobotState | undefined>(state)
+  if (state) lastValidStateRef.current = state
+  const effectiveState = state ?? lastValidStateRef.current
+
+  // 当 state 从有值变为无值后又恢复时，确保我们不会卸载组件
+  // 使用 hasEverHadState 标记：一旦有过有效 state，就保持组件挂载
+  const hasEverHadStateRef = useRef(false)
+  if (effectiveState) hasEverHadStateRef.current = true
+  const shouldRenderRobot = effectiveState || hasEverHadStateRef.current
+
+  const collision = effectiveState ? isObstacle(effectiveState.position.x, effectiveState.position.y) : false
+  const cellType: CellType | null = effectiveState ? getCellType(effectiveState.position.x, effectiveState.position.y) : null
 
   return (
     <div
@@ -36,7 +50,7 @@ export function RobotViewer({ robotId, state, trajectory, showMap = true }: Robo
         background: `linear-gradient(180deg, ${palette.bgTop} 0%, ${palette.bgBottom} 100%)`,
       }}
     >
-      {state && <StatusBadge state={state} collision={collision} cellType={cellType} />}
+      {effectiveState && <StatusBadge state={effectiveState} collision={collision} cellType={cellType} />}
       <Canvas
         shadows
         dpr={[1, 2]}
@@ -50,19 +64,25 @@ export function RobotViewer({ robotId, state, trajectory, showMap = true }: Robo
             避免 WS 高频帧（~10Hz）触发重建导致网格几何重绘闪烁 */}
         <SceneEnvironment palette={palette} showMap={showMap} />
 
-        {/* 2026-08-28 Suspense 包裹机器人 —— 为后续接入 useGLTF/URDF 异步加载预留兜底 */}
+        {/* Suspense 包裹机器人 —— 始终挂载，避免因短暂 falsy 导致卸载重挂载 */}
         <Suspense fallback={null}>
-          {state && <RobotBody state={state} collision={collision} />}
+          {shouldRenderRobot && (
+            <RobotBody
+              state={effectiveState ?? lastValidStateRef.current!}
+              collision={collision}
+              visible={!!effectiveState}
+            />
+          )}
         </Suspense>
 
-        {state && <HUDLabel
-          position={[state.position.x, 2.0, state.position.y]}
-          robot={state}
+        {effectiveState && <HUDLabel
+          position={[effectiveState.position.x, 2.0, effectiveState.position.y]}
+          robot={effectiveState}
           accentColor={palette.accent}
           primaryColor={palette.primary}
         />}
         {trajectory && trajectory.length > 1 && <GlowTrajectory points={trajectory} color={palette.accent} />}
-        {state && <GroundRing position={[state.position.x, 0, state.position.y]} color={palette.accent} />}
+        {effectiveState && <GroundRing position={[effectiveState.position.x, 0, effectiveState.position.y]} color={palette.accent} />}
 
         <OrbitControls
           makeDefault
@@ -96,12 +116,9 @@ const SceneEnvironment = memo(function SceneEnvironment({
 }) {
   return (
     <>
-      {/* 2026-08-28 新增: Environment preset="warehouse" 提供 PBR IBL 环境贴图，
-          金属/塑料材质呈现真实质感，这是 L2 视觉还原的关键 */}
-      <Environment preset="warehouse" />
-
-      {/* IBL 环境光已提供基础照明，降低 ambientLight 强度避免过曝 */}
-      <ambientLight intensity={0.35} color="#ffffff" />
+      {/* 2026-08-28: 移除 Environment preset="warehouse" — 依赖外部 CDN (githack.com)，
+          在受限网络环境下超时导致 Canvas 崩溃。改用增强型多光源方案替代 IBL。*/}
+      <ambientLight intensity={0.7} color="#e8edf5" />
 
       <directionalLight
         position={[6, 10, 6]}
@@ -174,16 +191,16 @@ const SceneEnvironment = memo(function SceneEnvironment({
   )
 })
 
-function RobotBody({ state, collision }: { state: UnifiedRobotState; collision: boolean }) {
+function RobotBody({ state, collision, visible = true }: { state: UnifiedRobotState; collision: boolean; visible?: boolean }) {
   const pos: [number, number, number] = [state.position.x, 0, state.position.y]
   const rot: [number, number, number] = [0, state.position.theta, 0]
 
   return (
-    <>
+    <group visible={visible}>
       {state.brand === 'unitree' && <G1Humanoid position={pos} rotation={rot} joints={state.joints} scale={1.0} />}
       {state.brand === 'keenon' && <PeanutBot position={pos} rotation={rot} />}
       {collision && <CollisionRing position={pos} />}
-    </>
+    </group>
   )
 }
 
