@@ -1,7 +1,7 @@
 import { useParams } from 'react-router-dom'
 import { useRobotStore } from '../stores/robotStore'
 import { useAlertStore } from '../stores/alertStore'
-import { RobotViewer, FanucArm, KukaArm } from 'digital-twin'
+import { RobotViewer, FanucArm, KukaArm, StateMachine } from 'digital-twin'
 import { Canvas } from '@react-three/fiber'
 import { useState } from 'react'
 import { Radio } from 'lucide-react'
@@ -20,14 +20,6 @@ export function TwinPage() {
     x: Math.cos(i * 0.5) * 2 + (selected?.position.x ?? 0),
     y: Math.sin(i * 0.5) * 2 + (selected?.position.y ?? 0),
   }))
-
-  const statusFlow: Array<{ key: string; label: string; color: string }> = [
-    { key: 'idle', label: 'IDLE', color: 'var(--status-offline)' },
-    { key: 'moving', label: 'MOVING', color: 'var(--status-moving)' },
-    { key: 'working', label: 'WORKING', color: 'var(--status-working)' },
-    { key: 'charging', label: 'CHARGING', color: 'var(--status-charging)' },
-  ]
-  const statusIndex = selected ? statusFlow.findIndex((s) => s.key === selected.status) : 0
 
   const recentAlerts = alerts.filter((a) => a.robotId === selected?.robotId).slice(0, 6)
 
@@ -251,32 +243,7 @@ export function TwinPage() {
         pointerEvents: 'none',
         animation: 'fadeInUp 0.6s var(--ease-out) 0.3s both',
       }}>
-        <div className="card hud-corners" style={{ padding: '12px 16px' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-tertiary)', letterSpacing: '0.15em', marginBottom: 8 }}>
-            STATE MACHINE
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-            {statusFlow.map((s, i) => (
-              <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <div style={{
-                  padding: '3px 8px',
-                  borderRadius: 4,
-                  background: i === statusIndex ? s.color : 'transparent',
-                  color: i === statusIndex ? 'var(--bg-base)' : s.color,
-                  border: `1px solid ${s.color}`,
-                  fontWeight: i === statusIndex ? 700 : 400,
-                  boxShadow: i === statusIndex ? `0 0 10px ${s.color}` : 'none',
-                  transition: 'all 0.3s ease',
-                }}>
-                  {s.label}
-                </div>
-                {i < statusFlow.length - 1 && (
-                  <span style={{ color: 'var(--text-tertiary)', fontSize: 10 }}>→</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+        <StateMachine current={(selected?.status as 'idle' | 'moving' | 'working' | 'charging') ?? 'idle'} />
       </div>
 
       {recentAlerts.length > 0 && (

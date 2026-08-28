@@ -499,7 +499,7 @@ export function G1Humanoid({ position, rotation, joints, scale = 1.0 }: G1Humano
   const rootRef = useRef<THREE.Group>(null)
 
   // L1 几何校验：Box3 测量机器人尺寸
-  // 验证 G1 身高 ≈ 1.30m，肩宽 ≈ 0.42m
+  // 验证 G1 身高 = 1.30m ±0.05m，肩宽 = 0.42m ±0.02m
   const l1MeasuredRef = useRef(false)
   useFrame(() => {
     if (l1MeasuredRef.current || !rootRef.current) return
@@ -509,18 +509,41 @@ export function G1Humanoid({ position, rotation, joints, scale = 1.0 }: G1Humano
     const center = new THREE.Vector3()
     box.getSize(size)
     box.getCenter(center)
-    // 2026-08-28: v3 详细 L1 校验日志
-    console.log('[g1-l1] Box3 尺寸 (m):', {
-      身高: size.y.toFixed(3),
-      宽度: size.x.toFixed(3),
-      深度: size.z.toFixed(3),
-      中心Y: center.y.toFixed(3),
-      minY: box.min.y.toFixed(3),
-      maxY: box.max.y.toFixed(3),
-      期望身高: '1.27-1.32',
-      期望肩宽: '≈0.42(全臂展)',
+
+    // 肩宽测量：遍历 mesh 找出肩部高度范围（约 1.05-1.20m）内的 X 极值
+    // 肩关节 X 坐标 ≈ ±0.100m → 肩宽 ≈ 0.200m，但全臂展 ≈ 0.42m
+    let shoulderMinX = Infinity
+    let shoulderMaxX = -Infinity
+    let shoulderMeshCount = 0
+    rootRef.current.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        const wp = new THREE.Vector3()
+        obj.getWorldPosition(wp)
+        // 肩部 Y 范围（从肩 pitch 到肩 yaw 区域）
+        if (wp.y > 1.0 && wp.y < 1.25) {
+          if (wp.x < shoulderMinX) shoulderMinX = wp.x
+          if (wp.x > shoulderMaxX) shoulderMaxX = wp.x
+          shoulderMeshCount++
+        }
+      }
     })
-    // 遍历子节点统计
+    const shoulderWidth = shoulderMaxX - shoulderMinX
+    const heightOk = Math.abs(size.y - 1.30) < 0.05
+    const shoulderOk = Math.abs(shoulderWidth - 0.42) < 0.02
+
+    console.table({
+      '身高实测(m)': Number(size.y.toFixed(3)),
+      '身高期望(m)': 1.30,
+      '身高校验': heightOk ? '✅ PASS' : '❌ FAIL',
+      '肩宽实测(m)': Number(shoulderWidth.toFixed(3)),
+      '肩宽期望(m)': 0.42,
+      '肩宽校验': shoulderOk ? '✅ PASS' : '❌ FAIL',
+      '深度(m)': Number(size.z.toFixed(3)),
+      '脚底Y': Number(box.min.y.toFixed(3)),
+      '头顶Y': Number(box.max.y.toFixed(3)),
+    })
+
+    // 详细 mesh 位置诊断
     let minMeshY = Infinity
     let maxMeshY = -Infinity
     const positions: string[] = []
@@ -541,9 +564,11 @@ export function G1Humanoid({ position, rotation, joints, scale = 1.0 }: G1Humano
     })
     console.log('[g1-l1] Mesh Y范围:', `min=${minMeshY.toFixed(3)}`, `max=${maxMeshY.toFixed(3)}`)
     console.log('[g1-l1] Group Y分布 (所有):', groupPositions.sort().join(', '))
-    console.log('[g1-l1] Mesh 最低20个:\n', positions.sort().slice(0, 20).join('\n '))
-    console.log('[g1-l1] Mesh 最高10个:\n', positions.sort().slice(-10).join('\n '))
     console.log('[g1-l1] Mesh 总数:', positions.length)
+
+    if (!heightOk || !shoulderOk) {
+      console.warn('[g1-l1] ⚠️ 等比例校验未通过，请检查！')
+    }
   })
 
   return (

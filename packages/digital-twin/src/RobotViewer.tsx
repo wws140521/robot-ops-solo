@@ -1,5 +1,5 @@
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Grid, ContactShadows, AdaptiveDpr, AdaptiveEvents } from '@react-three/drei'
+import { OrbitControls, Grid, ContactShadows, AdaptiveDpr, AdaptiveEvents, Environment } from '@react-three/drei'
 import { memo, Suspense, useRef } from 'react'
 import * as THREE from 'three'
 import { G1Humanoid } from './robots/G1Humanoid'
@@ -96,7 +96,12 @@ const SceneEnvironment = memo(function SceneEnvironment({
 }) {
   return (
     <>
-      <ambientLight intensity={0.75} color="#ffffff" />
+      {/* 2026-08-28 新增: Environment preset="warehouse" 提供 PBR IBL 环境贴图，
+          金属/塑料材质呈现真实质感，这是 L2 视觉还原的关键 */}
+      <Environment preset="warehouse" />
+
+      {/* IBL 环境光已提供基础照明，降低 ambientLight 强度避免过曝 */}
+      <ambientLight intensity={0.35} color="#ffffff" />
 
       <directionalLight
         position={[6, 10, 6]}
