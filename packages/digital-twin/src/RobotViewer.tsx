@@ -1,6 +1,6 @@
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Grid, ContactShadows, AdaptiveDpr, AdaptiveEvents } from '@react-three/drei'
-import { memo, Suspense, useRef } from 'react'
+import { memo, useRef } from 'react'
 import * as THREE from 'three'
 import { G1Humanoid } from './robots/G1Humanoid'
 import { PeanutBot } from './robots/PeanutBot'
@@ -64,16 +64,14 @@ export function RobotViewer({ state, trajectory, showMap = true }: RobotViewerPr
             避免 WS 高频帧（~10Hz）触发重建导致网格几何重绘闪烁 */}
         <SceneEnvironment palette={palette} showMap={showMap} />
 
-        {/* Suspense 包裹机器人 —— 始终挂载，避免因短暂 falsy 导致卸载重挂载 */}
-        <Suspense fallback={null}>
-          {shouldRenderRobot && (
-            <RobotBody
-              state={effectiveState ?? lastValidStateRef.current!}
-              collision={collision}
-              visible={!!effectiveState}
-            />
-          )}
-        </Suspense>
+        {/* 机器人 —— 始终挂载，G1Model 内部用 useRef 管理加载状态，不会因短暂 falsy 卸载 */}
+        {shouldRenderRobot && (
+          <RobotBody
+            state={effectiveState ?? lastValidStateRef.current!}
+            collision={collision}
+            visible={!!effectiveState}
+          />
+        )}
 
         {effectiveState && <HUDLabel
           position={[effectiveState.position.x, 2.0, effectiveState.position.y]}
