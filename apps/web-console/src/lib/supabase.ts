@@ -33,10 +33,15 @@ export function getSupabase(): SupabaseClient {
 }
 
 // 拿当前登录用户的 tenant_slug（未登录或离线模式返回默认租户）
-export async function getCurrentTenantSlug(): Promise<string> {
+// 2026-08-28 两处修正：1) getUser() 每次调用都发 /auth/v1/user 网络请求，
+// 未登录时被 WS 高频写入链路逐帧调用 → 每秒 ~30 次无效 401 请求 + 浏览器网络日志刷屏；
+// 改用 getSession() 读本地会话（零网络开销）。2) 未登录返回 null，存储层据此跳过写入，
+// 避免 RLS 逐帧拒绝产生的 [writeRobotState] error 洪泛
+export async function getCurrentTenantSlug(): Promise<string | null> {
   if (!supabase) return import.meta.env.VITE_DEFAULT_TENANT ?? 'default'
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  return (user?.user_metadata as { tenant_slug?: string } | undefined)?.tenant_slug ?? 'default'
+    data: { session },
+  } = await supabase.auth.getSession()
+  if (!session) return null // 未登录：存储层跳过写入，避免逐帧 401
+  return (session.user.user_metadata as { tenant_slug?: string } | undefined)?.tenant_slug ?? 'default'
 }

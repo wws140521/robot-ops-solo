@@ -7,6 +7,8 @@ import { writeRobotState } from './robotStorage'
 import { writeAlert } from './alertStorage'
 // 2026-08-18 工业品牌集合
 const INDUSTRIAL_BRANDS = new Set(['fanuc', 'kuka', 'estun', 'yaskawa'])
+// 2026-08-28 商用适配完成日志节流签名（robotId → 电量整数位:状态）
+const lastAdaptedSig: Record<string, string> = {}
 // 2026-08-18 wsHub 初始化，工业消息分流入口
 // 2026-08-21 接入 OTA 状态回调，将 MQTT ota/+/status 消息路由到 otaStore
 connectMqtt(
@@ -171,7 +173,12 @@ export function startWS(connections: WsConnection[]) {
             }
           } else {
             const state = adaptIncoming(brand, raw, robotId)
-            console.log('[wsHub] 商用适配完成:', { robotId, brand, status: state.status, battery: state.batteryPct })
+            // 2026-08-28 节流：仅在电量整数位或状态变化时打印，避免高频帧刷满 console 缓冲区
+            const sig = `${robotId}:${state.batteryPct | 0}:${state.status}`
+            if (lastAdaptedSig[robotId] !== sig) {
+              lastAdaptedSig[robotId] = sig
+              console.log('[wsHub] 商用适配完成:', { robotId, brand, status: state.status, battery: state.batteryPct })
+            }
             useRobotStore.getState().updateRobot(robotId, state)
             writeRobotState(state, raw) // 写入 Supabase robot_states 表（离线模式自动跳过）
           }

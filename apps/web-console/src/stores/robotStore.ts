@@ -17,6 +17,9 @@ interface RobotStore {
   initFromSupabase: () => Promise<void>
 }
 
+// 2026-08-28 updateRobot 日志节流签名（id → 状态:电量整数位:在线）
+const lastRobotLogSig: Record<string, string> = {}
+
 export const useRobotStore = create<RobotStore>((set) => ({
   robots: {},
   onlineCount: 0,
@@ -25,7 +28,12 @@ export const useRobotStore = create<RobotStore>((set) => ({
     set((s) => {
       const robots = { ...s.robots, [id]: state }
       const onlineCount = Object.values(robots).filter((r) => r.online).length
-      console.log('[robotStore] updateRobot:', { id, status: state.status, battery: state.batteryPct, online: state.online, totalOnline: onlineCount })
+      // 2026-08-28 节流：仅在状态/电量整数位/在线变化时打印，避免高频帧刷满 console 缓冲区
+      const sig = `${state.status}:${state.batteryPct | 0}:${state.online}`
+      if (lastRobotLogSig[id] !== sig) {
+        lastRobotLogSig[id] = sig
+        console.log('[robotStore] updateRobot:', { id, status: state.status, battery: state.batteryPct, online: state.online, totalOnline: onlineCount })
+      }
       return { robots, onlineCount }
     }),
 

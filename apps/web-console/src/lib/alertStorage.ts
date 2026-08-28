@@ -3,11 +3,21 @@
 import { supabase, isSupabaseEnabled, getCurrentTenantSlug } from './supabase'
 import type { UnifiedAlert } from 'robot-adapter-kit'
 
+// 2026-08-28 未登录跳过提示只打一次，与 writeRobotState 同策略（持续性状态不逐帧报错）
+let skippedAlertWarned = false
+
 // 写入告警（wsHub 收到 /alert 帧后调用）
 export async function writeAlert(alert: UnifiedAlert) {
   if (!isSupabaseEnabled) return
 
   const tenantSlug = await getCurrentTenantSlug()
+  if (!tenantSlug) {
+    if (!skippedAlertWarned) {
+      skippedAlertWarned = true
+      console.warn('[writeAlert] 未登录，跳过 Supabase 写入（登录后自动恢复）')
+    }
+    return
+  }
 
   const { error } = await supabase!.from('alerts').insert({
     robot_id: alert.robotId,
