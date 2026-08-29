@@ -241,7 +241,25 @@ wssUnitree.on('connection', (ws) => {
 
     const x = Math.round(g1Pos.x * 100) / 100
     const y = Math.round(g1Pos.y * 100) / 100
-    const jointsAngle = Date.now() / 250
+
+    // ─── 统一步态相位 ──────────────────────────────────
+    // 所有关节共享同一个 gaitPhase，通过固定相位偏移实现协调
+    //
+    // 相位约定（对侧协同 contralateral gait）：
+    //   左腿  phase = φ        (0 → π 前摆, π → 2π 后蹬)
+    //   右腿  phase = φ + π    (与左腿交替)
+    //   右臂  phase = φ        (与左腿同相 → 左腿前迈时右臂前摆 ✅)
+    //   左臂  phase = φ + π    (与右腿同相 → 右腿前迈时左臂前摆 ✅)
+    //
+    // 真实人形走路 = 左腿+右臂 同步 / 右腿+左臂 同步
+    //
+    // 步态频率: gaitFreq Hz → 周期 1/gaitFreq 秒
+    // Unitree G1 约 0.6~0.8 Hz 舒适步速
+    const gaitFreq = 0.7
+    const φ = (Date.now() / 1000) * gaitFreq * Math.PI * 2
+
+    // 辅助：只在摆动腿（sin > 0）时弯曲，支撑腿保持伸直
+    const flex = (p, amp) => Math.max(0, Math.sin(p)) * amp
 
     broadcastG1({
       topic: '/state',
@@ -250,45 +268,45 @@ wssUnitree.on('connection', (ws) => {
         voltage: 54.2 - (85 - g1Battery) * 0.1,
         position: { x, y, yaw: g1Heading },
         joints: {
-          // ─── 腰部 3（URDF: waist_yaw→roll→pitch） ───
-          waist_yaw_joint: Math.sin(jointsAngle * 0.5) * 0.15,
-          waist_roll_joint: Math.sin(jointsAngle * 0.7) * 0.1,
-          waist_pitch_joint: Math.sin(jointsAngle * 0.8) * 0.1,
+          // ─── 腰部 3：轻微 counter-rotation + 微前倾 ───
+          waist_yaw_joint:  Math.sin(φ + Math.PI) * 0.08,   // 骨盆反向旋转，抵消下肢转动
+          waist_roll_joint: Math.sin(φ * 2) * 0.05,         // 轻度左右摆
+          waist_pitch_joint: 0.03,                           // 固定微前倾
           // ─── 左腿 6 ───
-          left_hip_pitch_joint: Math.sin(jointsAngle * 2) * 0.3,
-          left_hip_roll_joint: Math.sin(jointsAngle * 1.5) * 0.15,
-          left_hip_yaw_joint: Math.sin(jointsAngle * 1) * 0.1,
-          left_knee_joint: Math.abs(Math.sin(jointsAngle * 2)) * 0.5,
-          left_ankle_pitch_joint: Math.sin(jointsAngle * 3) * 0.1,
-          left_ankle_roll_joint: Math.sin(jointsAngle * 2.5) * 0.05,
-          // ─── 右腿 6 ───
-          right_hip_pitch_joint: Math.sin(jointsAngle * 2 + Math.PI) * 0.3,
-          right_hip_roll_joint: Math.sin(jointsAngle * 1.5 + Math.PI) * 0.15,
-          right_hip_yaw_joint: Math.sin(jointsAngle * 1 + Math.PI) * 0.1,
-          right_knee_joint: Math.abs(Math.sin(jointsAngle * 2 + Math.PI)) * 0.5,
-          right_ankle_pitch_joint: Math.sin(jointsAngle * 3 + Math.PI) * 0.1,
-          right_ankle_roll_joint: Math.sin(jointsAngle * 2.5 + Math.PI) * 0.05,
-          // ─── 左臂 7 ───
-          left_shoulder_pitch_joint: Math.sin(jointsAngle * 1.2) * 0.4,
-          left_shoulder_roll_joint: Math.sin(jointsAngle * 0.9) * 0.2,
-          left_shoulder_yaw_joint: Math.sin(jointsAngle * 0.8) * 0.15,
-          left_elbow_joint: Math.abs(Math.sin(jointsAngle * 1.2)) * 0.6,
-          left_wrist_roll_joint: Math.sin(jointsAngle * 1.1) * 0.1,
-          left_wrist_pitch_joint: Math.sin(jointsAngle * 1.0) * 0.08,
-          left_wrist_yaw_joint: Math.sin(jointsAngle * 0.7) * 0.15,
-          // ─── 右臂 7 ───
-          right_shoulder_pitch_joint: Math.sin(jointsAngle * 1.2 + Math.PI) * 0.4,
-          right_shoulder_roll_joint: Math.sin(jointsAngle * 0.9 + Math.PI) * 0.2,
-          right_shoulder_yaw_joint: Math.sin(jointsAngle * 0.8 + Math.PI) * 0.15,
-          right_elbow_joint: Math.abs(Math.sin(jointsAngle * 1.2 + Math.PI)) * 0.6,
-          right_wrist_roll_joint: Math.sin(jointsAngle * 1.1 + Math.PI) * 0.1,
-          right_wrist_pitch_joint: Math.sin(jointsAngle * 1.0 + Math.PI) * 0.08,
-          right_wrist_yaw_joint: Math.sin(jointsAngle * 0.7 + Math.PI) * 0.15,
+          left_hip_pitch_joint: Math.sin(φ) * 0.35,          // 髋屈伸
+          left_hip_roll_joint:  Math.sin(φ * 2) * 0.08,      // 轻度侧摆
+          left_hip_yaw_joint:   Math.sin(φ) * 0.06,          // 小幅度内旋外旋
+          left_knee_joint:      flex(φ - 0.2, 0.55),         // 摆动期弯，提前 0.2 rad 开始弯
+          left_ankle_pitch_joint: Math.sin(φ + 0.3) * 0.18,  // 踝关节屈伸，跟随髋稍超前
+          left_ankle_roll_joint:  Math.sin(φ * 2) * 0.04,
+          // ─── 右腿 6（与左腿反相 π） ───
+          right_hip_pitch_joint: Math.sin(φ + Math.PI) * 0.35,
+          right_hip_roll_joint:  Math.sin(φ * 2 + Math.PI) * 0.08,
+          right_hip_yaw_joint:   Math.sin(φ + Math.PI) * 0.06,
+          right_knee_joint:      flex(φ + Math.PI - 0.2, 0.55),
+          right_ankle_pitch_joint: Math.sin(φ + Math.PI + 0.3) * 0.18,
+          right_ankle_roll_joint:  Math.sin(φ * 2 + Math.PI) * 0.04,
+          // ─── 左臂 7（与右腿同相 = φ + π，对侧协同） ───
+          left_shoulder_pitch_joint: Math.sin(φ + Math.PI) * 0.28,  // 臂摆幅比腿小
+          left_shoulder_roll_joint:  0.06,                            // 固定外展角，离开身体
+          left_shoulder_yaw_joint:   Math.sin(φ) * 0.06,
+          left_elbow_joint:          flex(φ + Math.PI - 0.1, 0.5),   // 摆动时肘微弯
+          left_wrist_roll_joint:     Math.sin(φ + Math.PI) * 0.04,
+          left_wrist_pitch_joint:    Math.sin(φ + Math.PI) * 0.04,
+          left_wrist_yaw_joint:      0,
+          // ─── 右臂 7（与左腿同相 = φ，对侧协同） ───
+          right_shoulder_pitch_joint: Math.sin(φ) * 0.28,
+          right_shoulder_roll_joint:  -0.06,                         // 右臂外展方向相反
+          right_shoulder_yaw_joint:    Math.sin(φ + Math.PI) * 0.06,
+          right_elbow_joint:           flex(φ - 0.1, 0.5),
+          right_wrist_roll_joint:      Math.sin(φ) * 0.04,
+          right_wrist_pitch_joint:     Math.sin(φ) * 0.04,
+          right_wrist_yaw_joint:       0,
           // 兼容旧版 key（G1Dog 使用）
-          hip_l: Math.sin(jointsAngle * 4) * 0.3,
-          hip_r: Math.sin(jointsAngle * 4 + Math.PI) * 0.3,
-          knee_l: Math.abs(Math.sin(jointsAngle * 4)) * 0.5,
-          knee_r: Math.abs(Math.sin(jointsAngle * 4 + Math.PI)) * 0.5,
+          hip_l: Math.sin(φ) * 0.3,
+          hip_r: Math.sin(φ + Math.PI) * 0.3,
+          knee_l: flex(φ - 0.2, 0.5),
+          knee_r: flex(φ + Math.PI - 0.2, 0.5),
         },
       },
     })
