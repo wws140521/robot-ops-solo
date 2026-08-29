@@ -15,5 +15,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    // cloudflared/ngrok 隧道会换域名，开发阶段放开 Host 校验
+    allowedHosts: true,
   },
 })

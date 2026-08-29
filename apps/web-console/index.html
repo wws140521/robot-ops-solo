@@ -6,7 +6,7 @@
     <!-- P6 安全加固：CSP（新增 2026-08-29 高德地图域名；高德必须 unsafe-eval + blob worker-src）-->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
-      script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://webapi.amap.com https://webst01.amap.com https://webst02.amap.com https://webst03.amap.com https://webst04.amap.com https://restapi.amap.com https://lbs.amap.com;
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://*.amap.com https://webapi.amap.com https://webst01.amap.com https://webst02.amap.com https://webst03.amap.com https://webst04.amap.com https://restapi.amap.com https://lbs.amap.com https://mapplugin.amap.com;
       style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://webapi.amap.com;
       font-src 'self' https://fonts.gstatic.com https://webapi.amap.com https://*.amap.com;
       connect-src 'self' ws://localhost:* wss://localhost:* ws://127.0.0.1:* wss://127.0.0.1:* https://*.supabase.co wss://*.supabase.co https://raw.githack.com https://*.githubusercontent.com https://unpkg.com https://cdn.jsdelivr.net https://webapi.amap.com https://*.amap.com https://restapi.amap.com https://lbs.amap.com https://*.amapapis.com;
