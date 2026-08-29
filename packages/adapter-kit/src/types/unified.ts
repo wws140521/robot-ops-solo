@@ -19,6 +19,20 @@ export interface UnifiedRobotState {
    * - 工业机器人（FANUC/KUKA/埃斯顿/安川）必传
    */
   industrial?: IndustrialExtension
+  /**
+   * 2026-08-29 室外模式扩展
+   * - mode: 'indoor' 时 position.x/y 是米（相对原点）
+   * - mode: 'outdoor' 时 position.x=经度, position.y=纬度 (GCJ-02)
+   */
+  mode?: 'indoor' | 'outdoor'
+  /** GPS/WGS-84 → GCJ-02 纠偏后的经纬度（室外模式必传） */
+  gps?: {
+    lng: number
+    lat: number
+    alt?: number
+    accuracy?: number
+    coordsys: 'gcj02'
+  }
 }
 
 // 2026-08-18 统一告警模型，所有品牌告警码翻译为 info/warn/error 三级

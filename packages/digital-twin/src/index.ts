@@ -11,3 +11,6 @@ export { HUDLabel } from './overlays/HUDLabel'
 export { StateMachine } from './overlays/StateMachine'
 export type { RobotState } from './overlays/StateMachine'
 export { SlamMap } from './environment/SlamMap'
+// 2026-08-29 室外模式坐标转换
+export { lngLatToWorld, routeToWorld } from './map/mapCoords'
+export type { MapContext } from './map/mapCoords'

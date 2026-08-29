@@ -53,6 +53,22 @@ let g1Pos = { x: 0, y: 0 } // 世界坐标
 let g1Heading = 0 // 弧度，当前朝向
 const G1_SPEED = 0.03 // 每 tick 前进距离
 
+// ─── 室外模式 GPS 路线（真实经纬度，朝阳大悦城周边 GCJ-02）──────────
+// 可以通过环境变量切换: OUTDOOR_MODE=true node mock-ws-server.js
+const OUTDOOR_MODE = process.env.OUTDOOR_MODE === 'true'
+const GpsRoute = [
+  { lng: 116.519942, lat: 39.924677 },  // 起点：商场门口
+  { lng: 116.520200, lat: 39.924900 },
+  { lng: 116.520500, lat: 39.925100 },
+  { lng: 116.520800, lat: 39.925300 },  // 取餐点 A
+  { lng: 116.521100, lat: 39.925100 },
+  { lng: 116.521400, lat: 39.924800 },  // 充电柜
+]
+let gpsSegIdx = 0
+let gpsSegProgress = 0
+let gpsLastLngLat = { lng: GpsRoute[0].lng, lat: GpsRoute[0].lat }
+console.log(`[mock] OUTDOOR_MODE=${OUTDOOR_MODE} ${OUTDOOR_MODE ? '→ GPS 真实路线' : '→ 室内避障巡航'}`)
+
 // 航点路径（餐厅内安全巡逻点，均为空地）
 const WAYPOINTS = [
   { x:  0.0, y:  0.0 }, // 起点（中心）
@@ -238,6 +254,39 @@ wssUnitree.on('connection', (ws) => {
     // 8. 电量递减，到 0 重置
     g1Battery = Math.max(0, g1Battery - 0.05)
     if (g1Battery <= 0) { g1Battery = 85; g1LastAlertLevel = 100 }
+
+    // 9. 室外模式: 沿真实经纬度路线移动 + 广播 /gps 帧
+    if (OUTDOOR_MODE) {
+      gpsSegProgress += 0.015  // 每 tick 推进 1.5%，约 67 ticks (6.7s) 走完一段
+      if (gpsSegProgress >= 1) {
+        gpsSegProgress = 0
+        gpsSegIdx = (gpsSegIdx + 1) % (GpsRoute.length - 1)
+      }
+      const from = GpsRoute[gpsSegIdx]
+      const to = GpsRoute[gpsSegIdx + 1]
+      const lng = from.lng + (to.lng - from.lng) * gpsSegProgress
+      const lat = from.lat + (to.lat - from.lat) * gpsSegProgress
+      const headingDeg = Math.atan2(to.lat - from.lat, to.lng - from.lng) * 180 / Math.PI
+      const heading180 = ((headingDeg % 360) + 360) % 360
+
+      // 低通滤波平滑
+      gpsLastLngLat = { lng, lat }
+
+      broadcastG1({
+        topic: '/gps',
+        data: {
+          deviceId: 'g1-001',
+          lng,
+          lat,
+          alt: 45,                  // 朝阳大悦城海拔约 45m
+          heading: heading180,       // 0-360, 正北=0
+          speed: 0.6,                // m/s
+          accuracy: 2.0,
+          coordsys: 'gcj02',          // mock 直接用 GCJ-02（真实场景若 WGS-84 需纠偏）
+          ts: Date.now(),
+        },
+      })
+    }
 
     const x = Math.round(g1Pos.x * 100) / 100
     const y = Math.round(g1Pos.y * 100) / 100

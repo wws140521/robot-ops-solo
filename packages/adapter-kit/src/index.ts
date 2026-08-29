@@ -21,3 +21,7 @@ export {
 } from './adapters'
 export { RobotWSClient } from './protocol/ws-client'
 export { connectMqtt, disconnectMqtt } from './protocol/mqtt-client'
+// 2026-08-29 室外模式 GPS 适配器
+export { adaptGps, wgs84ToGcj02 } from './adapters/adapter-gps'
+export type { GpsRawMsg } from './adapters/adapter-gps'
+export { lowPass, lowPassAngle } from './utils/smooth'

@@ -3,23 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- P6 安全加固：CSP 限制 connect-src 只允许 Supabase 域名 + WS 地址 -->
+    <!-- P6 安全加固：CSP（新增 2026-08-29 高德地图域名）-->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
-      script-src 'self';
-      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-      font-src 'self' https://fonts.gstatic.com;
-      connect-src 'self' ws://localhost:* wss://localhost:* ws://127.0.0.1:* wss://127.0.0.1:* https://*.supabase.co wss://*.supabase.co https://raw.githack.com https://*.githubusercontent.com https://unpkg.com https://cdn.jsdelivr.net;
-      img-src 'self' data: https:;
+      script-src 'self' 'unsafe-inline' https://webapi.amap.com https://webst01.amap.com https://webst02.amap.com https://webst03.amap.com https://webst04.amap.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://webapi.amap.com;
+      font-src 'self' https://fonts.gstatic.com https://webapi.amap.com https://*.amap.com;
+      connect-src 'self' ws://localhost:* wss://localhost:* ws://127.0.0.1:* wss://127.0.0.1:* https://*.supabase.co wss://*.supabase.co https://raw.githack.com https://*.githubusercontent.com https://unpkg.com https://cdn.jsdelivr.net https://webapi.amap.com https://*.amap.com https://restapi.amap.com https://lbs.amap.com https://*.amapapis.com;
+      img-src 'self' data: https: https://*.amap.com https://webst01.amap.com https://webst02.amap.com https://webst03.amap.com https://webst04.amap.com https://*.amapapis.com;
       frame-ancestors 'none';
     " />
     <title>Robot-Ops Console</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+
+    <!-- 2026-08-29 高德 JSAPI 安全密钥（AMap 2021-12-02 起强制要求）
+         ⚠️ 替换 .env 中 VITE_AMAP_SECURITY_CODE 后，也需要把这里硬编码成实际值。
+         如果 Vite 在注入时能处理，用模板变量；否则直接写死 -->
+    <script type="text/javascript">
+      window._AMapSecurityConfig = {
+        securityJsCode: '',  // TODO: 替换为实际 securityJsCode
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- 高德 JSAPI 2.0 —— 室外地图/路径规划/GLCustomLayer
+         key 替换 .env 中 VITE_AMAP_JS_KEY 实际值；plugins 按需扩展 -->
+    <script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=TODO_REPLACE_WITH_AMAP_JS_KEY&plugin=AMap.Walking,AMap.PlaceSearch,AMap.Geocoder,AMap.Scale,AMap.ControlBar,AMap.GLCustomLayer"></script>
   </body>
 </html>

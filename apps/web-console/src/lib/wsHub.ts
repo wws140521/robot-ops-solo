@@ -1,4 +1,4 @@
-import { RobotWSClient, adaptIncoming, adaptIncomingAlert, adaptByBrandEnhanced, connectMqtt } from 'robot-adapter-kit'
+import { RobotWSClient, adaptIncoming, adaptIncomingAlert, adaptByBrandEnhanced, connectMqtt, adaptGps } from 'robot-adapter-kit'
 import { useRobotStore } from '../stores/robotStore'
 import { useAlertStore } from '../stores/alertStore'
 import { useSpeakStore, type SpeakEvent } from '../stores/speakStore'
@@ -152,6 +152,12 @@ export function startWS(connections: WsConnection[]) {
           if (raw?.type === 'industrial_state' || raw?.type === 'industrial_alert') {
             console.log('[wsHub] 工业消息分流:', raw.type, raw.brand)
             handleIndustrialMessage(raw)
+            return
+          }
+          // 2026-08-29 室外 GPS 帧分流
+          if (raw?.topic === '/gps') {
+            const state = adaptGps(raw.data)
+            useRobotStore.getState().updateRobot(state.robotId, state)
             return
           }
           // 2026-08-21 OTA 状态分流（type: ota_status，mock 模式通过 WS 携带）
