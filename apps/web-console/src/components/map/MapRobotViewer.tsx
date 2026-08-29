@@ -37,15 +37,20 @@ export function MapRobotViewer({ center, route = [], zoom = 18 }: Props) {
   const cameraRef = useRef<THREE.PerspectiveCamera>()
   const rendererRef = useRef<THREE.WebGLRenderer>()
   const smoothPosRef = useRef<[number, number, number] | null>(null)
+  // ★ React StrictMode 双 mount 防护：用 DOM dataset 标记，简洁可靠
+  const STRICT_FLAG = 'data-amap-initialized'
 
   useEffect(() => {
-    let cancelled = false
+    const c = containerRef.current
+    if (!c) return
+    // 第二次 mount（StrictMode 或 react 重挂载）— 跳过 init，保留已创建的 map
+    if (c.hasAttribute(STRICT_FLAG)) return
+
+    let destroyed = false
     const init = async () => {
       try {
-        if (!containerRef.current || cancelled) return
-
         const AMap = await getAMap()
-        if (cancelled) return
+        if (destroyed || !containerRef.current) return
 
         const map = new AMap.Map(containerRef.current, {
           viewMode: '3D',
@@ -61,120 +66,124 @@ export function MapRobotViewer({ center, route = [], zoom = 18 }: Props) {
         const customCoords = map.customCoords
         customCoords.setCenter([center.lng, center.lat])
 
-        // Three 场景
-        const scene = new THREE.Scene()
-        const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1 << 30)
+        // ★ 全部 three 初始化延迟到 map complete 后，避免 customCoords 在瓦片加载前返回 NaN
+        map.on('complete', () => {
+          if (destroyed) return
+          const scene = new THREE.Scene()
+          const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1 << 30)
 
-        // 尝试用地图共享 GL context，不行则独立 canvas 叠层
-        let gl: WebGLRenderingContext | null = null
-        try { gl = map.getGLContext ? map.getGLContext() : null } catch (_) { /* noop */ }
+          let gl: WebGLRenderingContext | null = null
+          try { gl = map.getGLContext ? map.getGLContext() : null } catch (_) { /* noop */ }
 
-        let renderer: THREE.WebGLRenderer
-        if (gl) {
-          renderer = new THREE.WebGLRenderer({ context: gl as any, antialias: true })
-          renderer.autoClear = false
-        } else {
-          const mapCanvas = containerRef.current.querySelector('canvas') as HTMLCanvasElement | null
-          const overlay = document.createElement('canvas')
-          overlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:2;'
-          containerRef.current.appendChild(overlay)
-          renderer = new THREE.WebGLRenderer({ canvas: overlay, antialias: true, alpha: true })
-          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-          if (mapCanvas) {
-            const syncSize = () => renderer.setSize(mapCanvas.clientWidth, mapCanvas.clientHeight, false)
-            syncSize()
-            const ro = new ResizeObserver(syncSize)
-            ro.observe(mapCanvas)
+          let renderer: THREE.WebGLRenderer
+          if (gl) {
+            renderer = new THREE.WebGLRenderer({ context: gl as any, antialias: true })
+            renderer.autoClear = false
+          } else {
+            const mapCanvas = containerRef.current!.querySelector('canvas') as HTMLCanvasElement | null
+            const overlay = document.createElement('canvas')
+            overlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:2;'
+            containerRef.current!.appendChild(overlay)
+            renderer = new THREE.WebGLRenderer({ canvas: overlay, antialias: true, alpha: true })
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+            if (mapCanvas) {
+              const syncSize = () => renderer.setSize(mapCanvas.clientWidth, mapCanvas.clientHeight, false)
+              syncSize()
+              new ResizeObserver(syncSize).observe(mapCanvas)
+            }
           }
-        }
 
-        sceneRef.current = scene
-        cameraRef.current = camera
-        rendererRef.current = renderer
-        ctxRef.current = { map, customCoords, center: { ...center } }
+          sceneRef.current = scene
+          cameraRef.current = camera
+          rendererRef.current = renderer
+          ctxRef.current = { map, customCoords, center: { ...center } }
+          containerRef.current!.setAttribute(STRICT_FLAG, 'true')
 
-        // ─── 绘制路线折线 ───
-        if (route.length >= 2) {
-          const points = routeToWorld(ctxRef.current, route, 0.5)
-          const geom = new THREE.BufferGeometry().setFromPoints(
-            points.map(([x, y, z]) => new THREE.Vector3(x, y, z))
+          // ─── 绘制路线折线（NaN 防护）───
+          if (route.length >= 2) {
+            const points = routeToWorld(ctxRef.current, route, 0.5)
+            const validPoints = points.filter(([x, y, z]) => Number.isFinite(x + y + z))
+            if (validPoints.length >= 2) {
+              const geom = new THREE.BufferGeometry().setFromPoints(
+                validPoints.map(([x, y, z]) => new THREE.Vector3(x, y, z))
+              )
+              const mat = new THREE.LineBasicMaterial({
+                color: 0x00f0ff, transparent: true, opacity: 0.85,
+              })
+              scene.add(new THREE.Line(geom, mat))
+
+              ;[
+                { p: validPoints[0], color: 0x00e676 },
+                { p: validPoints[validPoints.length - 1], color: 0xff3d71 },
+              ].forEach(({ p, color }) => {
+                const m = new THREE.Mesh(
+                  new THREE.SphereGeometry(0.6, 16, 16),
+                  new THREE.MeshBasicMaterial({ color })
+                )
+                m.position.set(p[0], p[1] + 0.5, p[2])
+                scene.add(m)
+              })
+            }
+          }
+
+          // ─── 占位机器人胶囊 ───
+          const rob = new THREE.Group()
+          rob.name = 'outdoor-robot'
+          rob.add(new THREE.Mesh(
+            new THREE.CapsuleGeometry(0.4, 1.2, 4, 16),
+            new THREE.MeshStandardMaterial({
+              color: 0x00f0ff, metalness: 0.6, roughness: 0.25,
+              emissive: 0x00f0ff, emissiveIntensity: 0.3,
+            })
+          ))
+          const arrow = new THREE.Mesh(
+            new THREE.ConeGeometry(0.18, 0.5, 12),
+            new THREE.MeshBasicMaterial({ color: 0xffff00 })
           )
-          const mat = new THREE.LineBasicMaterial({
-            color: 0x00f0ff,
-            transparent: true,
-            opacity: 0.85,
+          arrow.position.set(0, 0.75, -0.55)
+          arrow.rotation.x = Math.PI / 2
+          rob.add(arrow)
+
+          const start = route.length >= 2
+            ? routeToWorld(ctxRef.current, [route[0]], 1.0)[0]
+            : lngLatToWorld(ctxRef.current, center.lng, center.lat, 1.0)
+          if (Number.isFinite(start[0] + start[1] + start[2])) {
+            rob.position.set(start[0], start[1], start[2])
+          }
+          scene.add(rob)
+          robotGroupRef.current = rob
+
+          // ─── GLCustomLayer 桥接 ───
+          map.add(new AMap.GLCustomLayer({
+            zIndex: 200,
+            render: () => {
+              const params = customCoords.getCameraParams()
+              if (!params) return
+              // NaN 防护：auth 失败时 getCameraParams 可能返回无效值
+              if (!Number.isFinite(params.position[0] + params.position[1] + params.position[2])) return
+              camera.near = params.near
+              camera.far = params.far
+              camera.fov = params.fov
+              camera.position.set(params.position[0], params.position[1], params.position[2])
+              camera.up.set(params.up[0], params.up[1], params.up[2])
+              camera.lookAt(params.lookAt[0], params.lookAt[1], params.lookAt[2])
+              camera.updateProjectionMatrix()
+              renderer.resetState()
+              renderer.render(scene, camera)
+              renderer.resetState()
+            },
+          }))
+
+          // 地图移动时重置 customCoords 中心
+          map.on('moveend', () => {
+            const c = map.getCenter()
+            customCoords.setCenter([c.lng, c.lat])
+            ctxRef.current.center = { lng: c.lng, lat: c.lat }
+            smoothPosRef.current = null
           })
-          scene.add(new THREE.Line(geom, mat))
 
-          // 起点绿 / 终点红
-          ;[
-            { p: points[0], color: 0x00e676 },
-            { p: points[points.length - 1], color: 0xff3d71 },
-          ].forEach(({ p, color }) => {
-            const m = new THREE.Mesh(
-              new THREE.SphereGeometry(0.6, 16, 16),
-              new THREE.MeshBasicMaterial({ color })
-            )
-            m.position.set(p[0], p[1] + 0.5, p[2])
-            scene.add(m)
-          })
-        }
-
-        // ─── 占位机器人（Capsule + 方向箭头）──────────
-        const rob = new THREE.Group()
-        rob.name = 'outdoor-robot'
-        rob.add(new THREE.Mesh(
-          new THREE.CapsuleGeometry(0.4, 1.2, 4, 16),
-          new THREE.MeshStandardMaterial({
-            color: 0x00f0ff,
-            metalness: 0.6, roughness: 0.25,
-            emissive: 0x00f0ff, emissiveIntensity: 0.3,
-          })
-        ))
-        const arrow = new THREE.Mesh(
-          new THREE.ConeGeometry(0.18, 0.5, 12),
-          new THREE.MeshBasicMaterial({ color: 0xffff00 })
-        )
-        arrow.position.set(0, 0.75, -0.55)
-        arrow.rotation.x = Math.PI / 2
-        rob.add(arrow)
-
-        const start = route.length >= 2
-          ? routeToWorld(ctxRef.current, [route[0]], 1.0)[0]
-          : lngLatToWorld(ctxRef.current, center.lng, center.lat, 1.0)
-        rob.position.set(start[0], start[1], start[2])
-        scene.add(rob)
-        robotGroupRef.current = rob
-
-        // ─── GLCustomLayer 桥接 ───
-        map.add(new AMap.GLCustomLayer({
-          zIndex: 200,
-          render: () => {
-            const params = customCoords.getCameraParams()
-            if (!params) return
-            camera.near = params.near
-            camera.far = params.far
-            camera.fov = params.fov
-            camera.position.set(params.position[0], params.position[1], params.position[2])
-            camera.up.set(params.up[0], params.up[1], params.up[2])
-            camera.lookAt(params.lookAt[0], params.lookAt[1], params.lookAt[2])
-            camera.updateProjectionMatrix()
-            renderer.resetState()
-            renderer.render(scene, camera)
-            renderer.resetState()
-          },
-        }))
-
-        // 地图移动时重置 customCoords 中心，避免浮点精度问题
-        map.on('moveend', () => {
-          const c = map.getCenter()
-          customCoords.setCenter([c.lng, c.lat])
-          ctxRef.current.center = { lng: c.lng, lat: c.lat }
-          // 重新设置胶囊位置
-          smoothPosRef.current = null
+          setReady(true)
         })
-
-        setReady(true)
       } catch (err: any) {
         setErr(err.message ?? String(err))
         console.error('[MapRobotViewer] 初始化失败:', err)
@@ -182,7 +191,20 @@ export function MapRobotViewer({ center, route = [], zoom = 18 }: Props) {
     }
 
     init()
-    return () => { /* 保留实例便于调试 */ }
+    return () => {
+      destroyed = true
+      // 真正 unmount 时才 destroy（StrictMode 模拟 unmount 不会到这里）
+      try { ctxRef.current?.map?.destroy?.() } catch (_) { /* noop */ }
+      try { rendererRef.current?.dispose?.() } catch (_) { /* noop */ }
+      try { sceneRef.current?.clear?.() } catch (_) { /* noop */ }
+      try { containerRef.current?.removeAttribute?.(STRICT_FLAG) } catch (_) { /* noop */ }
+      ctxRef.current = null
+      sceneRef.current = undefined
+      cameraRef.current = undefined
+      rendererRef.current = undefined
+      robotGroupRef.current = undefined
+      smoothPosRef.current = null
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [center.lng, center.lat, zoom])
 
