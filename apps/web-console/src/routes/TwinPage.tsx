@@ -1,10 +1,10 @@
 import { useParams } from 'react-router-dom'
 import { useRobotStore } from '../stores/robotStore'
 import { useAlertStore } from '../stores/alertStore'
-import { RobotViewer, FanucArm, KukaArm, StateMachine } from 'digital-twin'
+import { RobotViewer, FanucArm, KukaArm, StateMachine, __danceToggle } from 'digital-twin'
 import { Canvas } from '@react-three/fiber'
 import { useState } from 'react'
-import { Radio } from 'lucide-react'
+import { Radio, Music4 } from 'lucide-react'
 
 const INDUSTRIAL_BRANDS = new Set(['FANUC', 'KUKA', 'ESTUN', 'YASKAWA'])
 
@@ -15,11 +15,7 @@ export function TwinPage() {
   const robotList = Object.values(robots)
   const selected = id ? robots[id] : robotList[0]
   const [radarOn, setRadarOn] = useState(true)
-
-  const mockTrajectory = Array.from({ length: 20 }, (_, i) => ({
-    x: Math.cos(i * 0.5) * 2 + (selected?.position.x ?? 0),
-    y: Math.sin(i * 0.5) * 2 + (selected?.position.y ?? 0),
-  }))
+  const [dancing, setDancing] = useState(false)
 
   const recentAlerts = alerts.filter((a) => a.robotId === selected?.robotId).slice(0, 6)
 
@@ -51,7 +47,7 @@ export function TwinPage() {
               </Canvas>
             </div>
           ) : (
-            <RobotViewer robotId={selected.robotId} state={selected} trajectory={mockTrajectory} showMap />
+            <RobotViewer robotId={selected.robotId} state={selected} showMap />
           )
         ) : (
           <div style={{
@@ -90,6 +86,21 @@ export function TwinPage() {
           </select>
         </div>
         <div style={{ display: 'flex', gap: 8, pointerEvents: 'auto' }}>
+          {!INDUSTRIAL_BRANDS.has(selected?.brand ?? '') && selected?.brand === 'unitree' && (
+            <button
+              className="btn"
+              onClick={() => {
+                __danceToggle.current?.()
+                setDancing(!dancing)
+              }}
+              style={{
+                borderColor: dancing ? 'var(--primary)' : 'var(--border-base)',
+                color: dancing ? 'var(--primary)' : 'var(--text-secondary)',
+              }}
+            >
+              <Music4 size={14} style={{ marginRight: 4 }} /> {dancing ? '停止' : '跳科目三'}
+            </button>
+          )}
           <button
             className="btn"
             onClick={() => setRadarOn(!radarOn)}

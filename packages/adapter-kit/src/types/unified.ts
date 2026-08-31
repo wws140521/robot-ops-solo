@@ -32,6 +32,8 @@ export interface UnifiedRobotState {
     alt?: number
     accuracy?: number
     coordsys: 'gcj02'
+    heading?: number  // 0-360 正北=0（度）
+    speed?: number    // m/s
   }
 }
 

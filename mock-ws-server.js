@@ -37,9 +37,8 @@ function worldToGrid(wx, wz) {
 }
 
 function isObstacle(wx, wz) {
-  const { gx, gy } = worldToGrid(wx, wz)
-  if (gx < 0 || gy < 0 || gx >= GRID.cols || gy >= GRID.rows) return true
-  return LAYOUT[gy][gx] === 1
+  // 临时关闭障碍检测 → 让 G1 直线走验证 anchor 速度
+  return false
 }
 
 // ───────────────────────── 宇树 G1（8080）─────────────────────────
@@ -51,7 +50,7 @@ let g1LastAlertLevel = 100
 // 机器人状态：位置 + 当前目标点
 let g1Pos = { x: 0, y: 0 } // 世界坐标
 let g1Heading = 0 // 弧度，当前朝向
-const G1_SPEED = 0.03 // 每 tick 前进距离
+const G1_SPEED = 0.05 // 每 tick 前进距离（0.5 m/s）
 
 // ─── 室外模式 GPS 路线（真实经纬度，朝阳大悦城周边 GCJ-02）──────────
 // 可以通过环境变量切换: OUTDOOR_MODE=true node mock-ws-server.js
@@ -69,15 +68,15 @@ let gpsSegProgress = 0
 let gpsLastLngLat = { lng: GpsRoute[0].lng, lat: GpsRoute[0].lat }
 console.log(`[mock] OUTDOOR_MODE=${OUTDOOR_MODE} ${OUTDOOR_MODE ? '→ GPS 真实路线' : '→ 室内避障巡航'}`)
 
-// 航点路径（餐厅内安全巡逻点，均为空地）
+// 航点路径 —— 地图内安全巡逻（距障碍 > 0.5m）
 const WAYPOINTS = [
-  { x:  0.0, y:  0.0 }, // 起点（中心）
-  { x:  2.0, y:  0.0 }, // 东部通道
-  { x:  2.0, y:  1.5 }, // 东北角
-  { x: -1.0, y:  1.5 }, // 北段通道（避开 x<-2 隔墙）
-  { x: -1.0, y: -1.0 }, // 西侧通道
-  { x:  0.5, y: -1.0 }, // 西南段
-  { x:  0.5, y: -1.8 }, // 南部（出餐口附近，B点播报）
+  { x:  0.0, y:  0.0 },
+  { x:  1.8, y:  0.0 },  // 东
+  { x:  1.8, y:  1.6 },  // 北
+  { x: -1.8, y:  1.6 },  // 西
+  { x: -1.8, y: -1.6 },  // 南
+  { x:  1.8, y: -1.6 },  // 东
+  { x:  1.8, y:  0.0 },  // 北回到起点
 ]
 let wpIdx = 0
 
@@ -310,6 +309,10 @@ wssUnitree.on('connection', (ws) => {
     // 辅助：只在摆动腿（sin > 0）时弯曲，支撑腿保持伸直
     const flex = (p, amp) => Math.max(0, Math.sin(p)) * amp
 
+    // 2026-08-29 修复：/gps 和 /state 同时广播
+    //   /gps  → FleetMapPage 室外地图用（经纬度）
+    //   /state → RobotViewer 室内 3D 用（本地坐标 + 关节步态）
+    // 之前 OUTDOOR_MODE=true 时只广播 /gps，导致 RobotViewer 拿不到 position/joints
     broadcastG1({
       topic: '/state',
       data: {

@@ -104,7 +104,8 @@ function isAlertMessage(brand: string, raw: any): boolean {
   return false
 }
 
-// 处理 /speak：1. 写 speakStore 驱动气泡 2. 写 alertStore(info) 进告警流 3. 浏览器 TTS 朗读
+// 处理 /speak：瞬时播报事件，只驱动 SpeakBubble + TTS + speakStore.history
+// 不再进入告警流（alertStore 专门留给需要跟进/ack 的工业告警）
 function handleSpeak(raw: any, robotId: string) {
   const speakEvent: SpeakEvent = {
     robotId,
@@ -114,16 +115,6 @@ function handleSpeak(raw: any, robotId: string) {
   }
 
   useSpeakStore.getState().setSpeak(speakEvent)
-
-  const speakAlert = {
-    robotId,
-    level: 'info' as const,
-    code: 'SPEAK',
-    message: `🔊 播报: "${speakEvent.text}"`,
-    timestamp: speakEvent.timestamp,
-  }
-  useAlertStore.getState().addAlert(speakAlert)
-  writeAlert(speakAlert) // 写入 Supabase alerts 表（离线模式自动跳过）
 
   // 浏览器 TTS（零成本，演示效果）
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {

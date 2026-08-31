@@ -32,14 +32,14 @@ export function Floor({ color, reflectivity = 1.2 }: FloorProps = {}) {
         blur={[300, 100]}
         resolution={1024}
         mixBlur={1}
-        mixStrength={reflectivity}
+        mixStrength={reflectivity * 0.5}
         roughness={1}
         depthScale={1.2}
         minDepthThreshold={0.4}
         maxDepthThreshold={1.4}
         color={baseColor}
         metalness={0.5}
-        mirror={0.5}
+        mirror={0.2}
       />
     </mesh>
   )

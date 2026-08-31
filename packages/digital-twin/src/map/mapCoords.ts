@@ -8,18 +8,19 @@ export interface MapContext {
   center: { lng: number; lat: number }
 }
 
-/** 经纬度 → Three.js 世界坐标（X右/Y上/Z前，高度=Y） */
+/** 经纬度 → Three.js 世界坐标（GLCustomLayer 下 customCoords 返回值可直接喂给 Three）
+ *  customCoords.lngLatsToCoords 返回 [east_meters, north_meters] — 仅 2D！
+ *  Three 坐标系（GLCustomLayer 约定）：X=东, Y=上, Z=北
+ *  → 映射 [east, north] → [X, altitude, Z] = [x, alt, z]
+ */
 export function lngLatToWorld(
   ctx: MapContext,
   lng: number,
   lat: number,
   alt = 0,
 ): [number, number, number] {
-  const [[x, y, z]] = ctx.customCoords.lngLatsToCoords([[lng, lat, alt]])
-  // Three 坐标系：AMap customCoords 返回的 y 是水平距离，z 是高度
-  // 标准映射: Three.X = 东, Three.Y = 海拔(向上), Three.Z = 北
-  // customCoords 一般返回 [east, north, up] → Three 直接对应 [x, z, y]
-  return [x, z, y]
+  const [[east, north]] = ctx.customCoords.lngLatsToCoords([[lng, lat, alt]])
+  return [east, alt, north]
 }
 
 /** 路线折线（经纬度）→ Three.js 世界坐标 */

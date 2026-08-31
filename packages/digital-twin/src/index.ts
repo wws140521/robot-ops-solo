@@ -1,5 +1,5 @@
 export { RobotViewer } from './RobotViewer'
-export { G1Humanoid } from './robots/G1Humanoid'
+export { G1Humanoid, __danceToggle } from './robots/G1Humanoid'
 export { G1Dog } from './robots/G1Dog'
 export { PeanutBot } from './robots/PeanutBot'
 export { FanucArm } from './robots/FanucArm'
@@ -14,3 +14,6 @@ export { SlamMap } from './environment/SlamMap'
 // 2026-08-29 室外模式坐标转换
 export { lngLatToWorld, routeToWorld } from './map/mapCoords'
 export type { MapContext } from './map/mapCoords'
+// 原生 three.js G1 加载（非 R3F，用于 AMap GLCustomLayer 等场景）
+export { loadG1ForScene } from './robots/nativeG1'
+export type { G1LoadResult } from './robots/nativeG1'

@@ -87,6 +87,8 @@ export function adaptGps(raw: GpsRawMsg): UnifiedRobotState {
       alt: raw.alt,
       accuracy: raw.accuracy,
       coordsys: 'gcj02',
+      heading: raw.heading,
+      speed: raw.speed,
     },
   }
 }

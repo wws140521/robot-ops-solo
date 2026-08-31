@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { getAMap } from '../../lib/amap'
-import { lngLatToWorld, routeToWorld } from 'digital-twin'
+import { lngLatToWorld, routeToWorld, loadG1ForScene } from 'digital-twin'
 import { useRobotStore } from '../../stores/robotStore'
 
 interface RoutePoint { lng: number; lat: number }
@@ -27,14 +27,12 @@ function lowPass3(current: [number, number, number], prev: [number, number, numb
   ]
 }
 
-export function MapRobotViewer({ center, route = [], zoom = 18 }: Props) {
+export function MapRobotViewer({ center, route = [], zoom = 20 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [ready, setReady] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const ctxRef = useRef<any>(null)
   const robotGroupRef = useRef<THREE.Group>()
-  const sceneRef = useRef<THREE.Scene>()
-  const cameraRef = useRef<THREE.PerspectiveCamera>()
   const rendererRef = useRef<THREE.WebGLRenderer>()
   const smoothPosRef = useRef<[number, number, number] | null>(null)
   // ★ React StrictMode 双 mount 防护：用 DOM dataset 标记，简洁可靠
@@ -54,8 +52,9 @@ export function MapRobotViewer({ center, route = [], zoom = 18 }: Props) {
 
         const map = new AMap.Map(containerRef.current, {
           viewMode: '3D',
-          pitch: 55,
-          rotation: -35,
+          // 2026-08-29 视角优化：正北朝上 + 平缓俯视 + 路线全貌
+          pitch: 40,
+          rotation: 0,
           zoom,
           center: [center.lng, center.lat],
           mapStyle: 'amap://styles/dark',
@@ -69,9 +68,15 @@ export function MapRobotViewer({ center, route = [], zoom = 18 }: Props) {
         // ★ 全部 three 初始化延迟到 map complete 后，避免 customCoords 在瓦片加载前返回 NaN
         map.on('complete', () => {
           if (destroyed) return
+
           const scene = new THREE.Scene()
           const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1 << 30)
 
+          // 基础光源
+          scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+          scene.add(new THREE.DirectionalLight(0xffffff, 1.0))
+
+          // ─── Renderer：优先共享 GL context，否则独立 canvas overlay ───
           let gl: WebGLRenderingContext | null = null
           try { gl = map.getGLContext ? map.getGLContext() : null } catch (_) { /* noop */ }
 
@@ -93,57 +98,111 @@ export function MapRobotViewer({ center, route = [], zoom = 18 }: Props) {
             }
           }
 
-          sceneRef.current = scene
-          cameraRef.current = camera
-          rendererRef.current = renderer
           ctxRef.current = { map, customCoords, center: { ...center } }
           containerRef.current!.setAttribute(STRICT_FLAG, 'true')
 
-          // ─── 绘制路线折线（NaN 防护）───
+          // ─── 绘制路线折线（光晕双层：地面发光 + 主线高亮） ───
           if (route.length >= 2) {
             const points = routeToWorld(ctxRef.current, route, 0.5)
             const validPoints = points.filter(([x, y, z]) => Number.isFinite(x + y + z))
             if (validPoints.length >= 2) {
-              const geom = new THREE.BufferGeometry().setFromPoints(
-                validPoints.map(([x, y, z]) => new THREE.Vector3(x, y, z))
-              )
-              const mat = new THREE.LineBasicMaterial({
-                color: 0x00f0ff, transparent: true, opacity: 0.85,
-              })
-              scene.add(new THREE.Line(geom, mat))
+              const worldPts = validPoints.map(([x, y, z]) => new THREE.Vector3(x, y, z))
 
+              // ① 地面发光层（宽 halo + 低透明度，Y 略高于地面避免 z-fighting）
+              const haloGeom = new THREE.BufferGeometry().setFromPoints(
+                worldPts.map((p) => new THREE.Vector3(p.x, 0.05, p.z))
+              )
+              scene.add(new THREE.Line(haloGeom, new THREE.LineBasicMaterial({
+                color: 0x00f0ff, transparent: true, opacity: 0.35,
+              })))
+
+              // ② 主色层（悬浮 2m + 实线）
+              const mainGeom = new THREE.BufferGeometry().setFromPoints(
+                worldPts.map((p) => new THREE.Vector3(p.x, p.y + 2.0, p.z))
+              )
+              scene.add(new THREE.Line(mainGeom, new THREE.LineBasicMaterial({
+                color: 0x00f0ff, transparent: true, opacity: 1.0,
+              })))
+
+              // ③ 虚线辅助层（地面半透明 + 虚线感）
+              // three.js LineBasicMaterial 不能设 dash，用 shaderMaterial 太复杂
+              // 简化：再加一条更低的亮青色线增强立体感
+              const accentGeom = new THREE.BufferGeometry().setFromPoints(
+                worldPts.map((p) => new THREE.Vector3(p.x, 0.08, p.z))
+              )
+              scene.add(new THREE.Line(accentGeom, new THREE.LineBasicMaterial({
+                color: 0x88ffff, transparent: true, opacity: 0.6,
+              })))
+
+              // 起终点 marker（放大 + halo）
               ;[
-                { p: validPoints[0], color: 0x00e676 },
-                { p: validPoints[validPoints.length - 1], color: 0xff3d71 },
+                { p: validPoints[0], color: 0x00e676, label: '起点' },
+                { p: validPoints[validPoints.length - 1], color: 0xff3d71, label: '终点' },
               ].forEach(({ p, color }) => {
                 const m = new THREE.Mesh(
-                  new THREE.SphereGeometry(0.6, 16, 16),
+                  new THREE.SphereGeometry(2.8, 16, 16),
                   new THREE.MeshBasicMaterial({ color })
                 )
-                m.position.set(p[0], p[1] + 0.5, p[2])
+                m.position.set(p[0], p[1] + 2.2, p[2])
                 scene.add(m)
+                const halo = new THREE.Mesh(
+                  new THREE.RingGeometry(2.8, 3.6, 32),
+                  new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.7 })
+                )
+                halo.rotation.x = -Math.PI / 2
+                halo.position.set(p[0], p[1] + 0.02, p[2])
+                scene.add(halo)
               })
             }
           }
 
-          // ─── 占位机器人胶囊 ───
+          // ─── 室外机器人：先放占位，异步加载真实 G1 ───
           const rob = new THREE.Group()
           rob.name = 'outdoor-robot'
+          // 临时占位（G1 加载完成后自动替换成真实人形）
           rob.add(new THREE.Mesh(
-            new THREE.CapsuleGeometry(0.4, 1.2, 4, 16),
+            new THREE.CapsuleGeometry(0.4, 1.2, 6, 24),
             new THREE.MeshStandardMaterial({
-              color: 0x00f0ff, metalness: 0.6, roughness: 0.25,
-              emissive: 0x00f0ff, emissiveIntensity: 0.3,
+              color: 0x00f0ff, metalness: 0.4, roughness: 0.3,
+              emissive: 0x00f0ff, emissiveIntensity: 0.5,
             })
           ))
           const arrow = new THREE.Mesh(
-            new THREE.ConeGeometry(0.18, 0.5, 12),
+            new THREE.ConeGeometry(0.15, 0.5, 10),
             new THREE.MeshBasicMaterial({ color: 0xffff00 })
           )
-          arrow.position.set(0, 0.75, -0.55)
+          arrow.position.set(0, 0.6, -0.35)
           arrow.rotation.x = Math.PI / 2
           rob.add(arrow)
 
+          // 异步加载真实 G1 URDF + STL
+          loadG1ForScene(scene).then(({ anchor }) => {
+            // anchor 已加到 scene，让它成为 rob 的子节点
+            rob.clear()
+            rob.add(anchor)
+            // 1.3m 真实身高在 zoom=18 地图上太小 → 放大 3 倍（视觉上 4m，仍然合理）
+            anchor.scale.setScalar(3.0)
+            // 给 G1 加光环 + 方向箭头
+            const halo = new THREE.Mesh(
+              new THREE.RingGeometry(2.0, 2.5, 32),
+              new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide, transparent: true, opacity: 0.7 })
+            )
+            halo.rotation.x = -Math.PI / 2
+            halo.position.y = 0.03
+            rob.add(halo)
+            const g1Arrow = new THREE.Mesh(
+              new THREE.ConeGeometry(0.4, 1.2, 10),
+              new THREE.MeshBasicMaterial({ color: 0xffff00 })
+            )
+            g1Arrow.position.set(0, 2.2, -0.7)
+            g1Arrow.rotation.x = Math.PI / 2
+            rob.add(g1Arrow)
+            console.log('[MapRobotViewer] ✅ 真实 G1 人形模型已加载')
+          }).catch((err) => {
+            console.warn('[MapRobotViewer] G1 加载失败，保留 Capsule 占位:', err)
+          })
+
+          // 初始位置：路线起点或中心
           const start = route.length >= 2
             ? routeToWorld(ctxRef.current, [route[0]], 1.0)[0]
             : lngLatToWorld(ctxRef.current, center.lng, center.lat, 1.0)
@@ -153,13 +212,12 @@ export function MapRobotViewer({ center, route = [], zoom = 18 }: Props) {
           scene.add(rob)
           robotGroupRef.current = rob
 
-          // ─── GLCustomLayer 桥接 ───
+          // ─── GLCustomLayer 桥接渲染 ───
           map.add(new AMap.GLCustomLayer({
             zIndex: 200,
             render: () => {
               const params = customCoords.getCameraParams()
               if (!params) return
-              // NaN 防护：auth 失败时 getCameraParams 可能返回无效值
               if (!Number.isFinite(params.position[0] + params.position[1] + params.position[2])) return
               camera.near = params.near
               camera.far = params.far
@@ -167,6 +225,13 @@ export function MapRobotViewer({ center, route = [], zoom = 18 }: Props) {
               camera.position.set(params.position[0], params.position[1], params.position[2])
               camera.up.set(params.up[0], params.up[1], params.up[2])
               camera.lookAt(params.lookAt[0], params.lookAt[1], params.lookAt[2])
+              // aspect: AMap params 里没 width/height，从 three overlay canvas 取
+              const canvasEl = renderer.domElement
+              if (canvasEl) {
+                camera.aspect = canvasEl.width / canvasEl.height || 1
+              } else if (params.width && params.height) {
+                camera.aspect = params.width / params.height
+              }
               camera.updateProjectionMatrix()
               renderer.resetState()
               renderer.render(scene, camera)
@@ -182,25 +247,22 @@ export function MapRobotViewer({ center, route = [], zoom = 18 }: Props) {
             smoothPosRef.current = null
           })
 
+          rendererRef.current = renderer
           setReady(true)
         })
       } catch (err: any) {
         setErr(err.message ?? String(err))
-        console.error('[MapRobotViewer] 初始化失败:', err)
+        console.error('[MapRobotViewer] init failed:', err)
       }
     }
 
     init()
     return () => {
       destroyed = true
-      // 真正 unmount 时才 destroy（StrictMode 模拟 unmount 不会到这里）
       try { ctxRef.current?.map?.destroy?.() } catch (_) { /* noop */ }
       try { rendererRef.current?.dispose?.() } catch (_) { /* noop */ }
-      try { sceneRef.current?.clear?.() } catch (_) { /* noop */ }
       try { containerRef.current?.removeAttribute?.(STRICT_FLAG) } catch (_) { /* noop */ }
       ctxRef.current = null
-      sceneRef.current = undefined
-      cameraRef.current = undefined
       rendererRef.current = undefined
       robotGroupRef.current = undefined
       smoothPosRef.current = null
@@ -208,27 +270,31 @@ export function MapRobotViewer({ center, route = [], zoom = 18 }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [center.lng, center.lat, zoom])
 
-  // 订阅 robotStore → 实时移动胶囊 + 朝向
+  // 订阅 robotStore → 实时移动 G1 + 朝向
   useEffect(() => {
     if (!ready) return
     return useRobotStore.subscribe((state) => {
       if (!ctxRef.current || !robotGroupRef.current) return
       const robot = Object.values(state.robots).find((r) => r.mode === 'outdoor')
       if (!robot) return
-      const [x, y, z] = lngLatToWorld(
-        ctxRef.current,
-        robot.position.x,   // 经度
-        robot.position.y,   // 纬度
-        0,
-      )
+
+      // 2026-08-29 修复：优先用 state.gps.lng/lat（GPS 专用字段），
+      // 因为 /state 广播会用室内坐标覆盖 position.x/y
+      const lng = robot.gps?.lng ?? robot.position.x
+      const lat = robot.gps?.lat ?? robot.position.y
+      const headingRad = robot.gps
+        ? (robot.gps.heading ?? 0) * Math.PI / 180
+        : robot.position.theta
+
+      const [x, y, z] = lngLatToWorld(ctxRef.current, lng, lat, 0)
       const target: [number, number, number] = [x, y + 0.8, z]
       const prev = smoothPosRef.current ?? target
       const smoothed = lowPass3(target, prev, 0.25)
       smoothPosRef.current = smoothed
 
       robotGroupRef.current.position.set(smoothed[0], smoothed[1], smoothed[2])
-      // heading(theta) 弧度 → 胶囊旋转，three -Z 朝前
-      robotGroupRef.current.rotation.y = -robot.position.theta
+      // heading(theta) 弧度 → three -Z 朝前
+      robotGroupRef.current.rotation.y = -headingRad
     })
   }, [ready])
 

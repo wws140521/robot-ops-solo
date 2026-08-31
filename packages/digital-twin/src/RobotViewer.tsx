@@ -1,26 +1,21 @@
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Grid, ContactShadows, AdaptiveDpr, AdaptiveEvents } from '@react-three/drei'
 import { memo, useRef } from 'react'
-import * as THREE from 'three'
 import { G1Humanoid } from './robots/G1Humanoid'
 import { PeanutBot } from './robots/PeanutBot'
 import { Floor } from './environment/Floor'
-import { SlamMap } from './environment/SlamMap'
-import { isObstacle, getCellType, type CellType } from './environment/collision'
-import { GlowTrajectory } from './overlays/GlowTrajectory'
-import { StatusBadge } from './overlays/StatusBadge'
-import { HUDLabel } from './overlays/HUDLabel'
+import { SceneAssets } from './environment/SceneAssets'
+
 import { useScenePalette } from './hooks/useScenePalette'
 import type { UnifiedRobotState } from 'robot-adapter-kit'
 
 interface RobotViewerProps {
   robotId: string
   state?: UnifiedRobotState
-  trajectory?: { x: number; y: number }[]
   showMap?: boolean
 }
 
-export function RobotViewer({ state, trajectory, showMap = true }: RobotViewerProps) {
+export function RobotViewer({ state, showMap = true }: RobotViewerProps) {
   const palette = useScenePalette()
 
   // 用 ref 缓存最新 state，防止短暂 falsy 导致 RobotBody 卸载
@@ -36,9 +31,6 @@ export function RobotViewer({ state, trajectory, showMap = true }: RobotViewerPr
   if (effectiveState) hasEverHadStateRef.current = true
   const shouldRenderRobot = effectiveState || hasEverHadStateRef.current
 
-  const collision = effectiveState ? isObstacle(effectiveState.position.x, effectiveState.position.y) : false
-  const cellType: CellType | null = effectiveState ? getCellType(effectiveState.position.x, effectiveState.position.y) : null
-
   return (
     <div
       style={{
@@ -50,7 +42,7 @@ export function RobotViewer({ state, trajectory, showMap = true }: RobotViewerPr
         background: `linear-gradient(180deg, ${palette.bgTop} 0%, ${palette.bgBottom} 100%)`,
       }}
     >
-      {effectiveState && <StatusBadge state={effectiveState} collision={collision} cellType={cellType} />}
+      {/* {effectiveState && <StatusBadge state={effectiveState} collision={collision} cellType={cellType} />} */}
       <Canvas
         shadows
         dpr={[1, 2]}
@@ -68,19 +60,19 @@ export function RobotViewer({ state, trajectory, showMap = true }: RobotViewerPr
         {shouldRenderRobot && (
           <RobotBody
             state={effectiveState ?? lastValidStateRef.current!}
-            collision={collision}
             visible={!!effectiveState}
           />
         )}
 
-        {effectiveState && <HUDLabel
+        {/* {effectiveState && <HUDLabel
           position={[effectiveState.position.x, 2.0, effectiveState.position.y]}
           robot={effectiveState}
           accentColor={palette.accent}
           primaryColor={palette.primary}
-        />}
-        {trajectory && trajectory.length > 1 && <GlowTrajectory points={trajectory} color={palette.accent} />}
-        {effectiveState && <GroundRing position={[effectiveState.position.x, 0, effectiveState.position.y]} color={palette.accent} />}
+        />} */}
+        {/* 轨迹线关闭 */}
+        {/* {trajectory && trajectory.length > 1 && <GlowTrajectory points={trajectory} color={palette.accent} />} */}
+        {/* {effectiveState && <GroundRing position={[effectiveState.position.x, 0, effectiveState.position.y]} color={palette.accent} />} */}
 
         <OrbitControls
           makeDefault
@@ -149,7 +141,7 @@ const SceneEnvironment = memo(function SceneEnvironment({
       />
 
       {/* 2026-08-28 Floor 升级 MeshReflectorMaterial，反射强度 1.2 提供金属质感 */}
-      <Floor color={palette.floor} reflectivity={1.2} />
+      <Floor color={palette.floor} reflectivity={0} />
 
       {/* 2026-08-28 Grid 抬升 0.005 + 移除 infiniteGrid + 降低线宽 → 消除鼠标拖拽时网格闪烁 */}
       <group position={[0, 0.005, 0]}>
@@ -168,72 +160,30 @@ const SceneEnvironment = memo(function SceneEnvironment({
       </group>
 
       {showMap && (
-        <SlamMap
-          wallPerimColor={palette.wallPerim}
-          wallInnerColor={palette.wallInner}
-          wallPerimEmissive={palette.wallPerimEmissive}
-          wallInnerEmissive={palette.wallInnerEmissive}
-        />
+        <SceneAssets palette={palette} />
       )}
 
       <ContactShadows
         position={[0, 0.012, 0]}
-        opacity={0.25}
+        opacity={0.2}
         scale={18}
         blur={2.4}
         far={6}
-        resolution={1024}
+        resolution={512}
         color={palette.shadow}
       />
     </>
   )
 })
 
-function RobotBody({ state, collision, visible = true }: { state: UnifiedRobotState; collision: boolean; visible?: boolean }) {
+function RobotBody({ state, visible = true }: { state: UnifiedRobotState; visible?: boolean }) {
   const pos: [number, number, number] = [state.position.x, 0, state.position.y]
   const rot: [number, number, number] = [0, state.position.theta, 0]
 
   return (
     <group visible={visible}>
-      {state.brand === 'unitree' && <G1Humanoid position={pos} rotation={rot} joints={state.joints} scale={1.0} />}
+      {state.brand === 'unitree' && <G1Humanoid position={pos} rotation={rot} scale={1.0} />}
       {state.brand === 'keenon' && <PeanutBot position={pos} rotation={rot} />}
-      {collision && <CollisionRing position={pos} />}
     </group>
-  )
-}
-
-function CollisionRing({ position }: { position: [number, number, number] }) {
-  const matRef = useRef<THREE.MeshBasicMaterial>(null)
-  useFrame((s) => {
-    if (matRef.current) {
-      matRef.current.opacity = 0.4 + 0.45 * Math.sin(s.clock.elapsedTime * 6)
-    }
-  })
-  return (
-    <mesh position={[position[0], 0.03, position[2]]} rotation={[-Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[0.5, 0.62, 36]} />
-      <meshBasicMaterial ref={matRef} color="#ff1744" transparent opacity={0.8} side={THREE.DoubleSide} />
-    </mesh>
-  )
-}
-
-function GroundRing({
-  position,
-  color = '#4a9eff',
-}: {
-  position: [number, number, number]
-  color?: string
-}) {
-  const matRef = useRef<THREE.MeshBasicMaterial>(null)
-  useFrame((s) => {
-    if (matRef.current) {
-      matRef.current.opacity = 0.25 + 0.2 * Math.sin(s.clock.elapsedTime * 2)
-    }
-  })
-  return (
-    <mesh position={[position[0], 0.02, position[2]]} rotation={[-Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[0.7, 0.85, 48]} />
-      <meshBasicMaterial ref={matRef} color={color} transparent opacity={0.3} side={THREE.DoubleSide} />
-    </mesh>
   )
 }
