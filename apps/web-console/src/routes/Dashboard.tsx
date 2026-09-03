@@ -4,7 +4,7 @@ import { useRobotStore } from '../stores/robotStore'
 import { useAlertStore } from '../stores/alertStore'
 import { useThemeStore } from '../stores/themeStore'
 import { RobotStatusCard, BatteryGauge, AlertItem, GlassCard, StatusDot, NeonBadge, TaskTimeline, HealthGauge, type TimelineItem } from 'ui-kit'
-import type { UnifiedRobotState } from 'robot-adapter-kit'
+import type { UnifiedRobotState, DeviceClass } from 'robot-adapter-kit'
 import { Download, Plus, Bot, BatteryCharging, Bell, LayoutGrid, CheckCircle2, X } from 'lucide-react'
 import { getBrandConfig } from '../lib/brandRegistry'
 
@@ -24,7 +24,43 @@ export function Dashboard() {
 
   const [showAdd, setShowAdd] = useState(false)
   const [newId, setNewId] = useState('')
-  const [newBrand, setNewBrand] = useState<'unitree' | 'keenon' | 'agibot' | 'pudutech'>('unitree')
+  const [newDeviceClass, setNewDeviceClass] = useState<DeviceClass>('ground_robot')
+  const [newBrand, setNewBrand] = useState<string>('unitree')
+
+  // 设备类 → 可选品牌列表（低空设备 brand 和地面机器人 brand 不在一个命名空间）
+  const DEVICE_CLASS_OPTIONS: { value: DeviceClass; label: string }[] = [
+    { value: 'ground_robot', label: '地面机器人' },
+    { value: 'uav_dock', label: '无人机机巢' },
+    { value: 'vertiport', label: 'eVTOL 起降场' },
+    { value: 'gateway', label: '边缘网关' },
+  ]
+
+  const BRAND_BY_CLASS: Record<DeviceClass, { value: string; label: string; model: string }[]> = {
+    ground_robot: [
+      { value: 'unitree', label: '宇树 (unitree)', model: 'G1' },
+      { value: 'keenon', label: '擎朗 (keenon)', model: 'Peanut' },
+      { value: 'agibot', label: '智元 (agibot)', model: 'A2' },
+      { value: 'pudutech', label: '普渡 (pudutech)', model: 'BellaBot' },
+    ],
+    uav_dock: [
+      { value: 'dji-dock', label: '大疆机巢 (dji-dock)', model: 'Dock 2' },
+      { value: 'autel-dock', label: '道通机巢 (autel-dock)', model: 'EVO Nest' },
+    ],
+    vertiport: [
+      { value: 'vertiport', label: '通用起降场 (vertiport)', model: 'Vertiport V1' },
+    ],
+    gateway: [
+      { value: 'gateway', label: '边缘网关 (gateway)', model: 'Edge Gateway' },
+    ],
+    // uav 是无人机本体遥测，通常由机巢/起降场自动带出，不单独手动添加
+    uav: [],
+  }
+
+  // 设备类切换时，把品牌重置到该类的第一个，避免跨类残留
+  const handleDeviceClassChange = (cls: DeviceClass) => {
+    setNewDeviceClass(cls)
+    setNewBrand(BRAND_BY_CLASS[cls][0].value)
+  }
 
   // 导出机器人状态 CSV
   const handleExport = () => {
@@ -48,20 +84,58 @@ export function Dashboard() {
     URL.revokeObjectURL(url)
   }
 
-  // 手动添加一个机器人
+  // 手动添加一台设备（地面机器人 / 机巢 / 起降场 / 网关）
   const handleAdd = () => {
     if (!newId.trim()) return
+
+    const brandInfo = BRAND_BY_CLASS[newDeviceClass].find((b) => b.value === newBrand)
+    const model = brandInfo?.model ?? 'unknown'
+
+    // 基础状态：所有设备都有的字段
     const state: UnifiedRobotState = {
       robotId: newId.trim(),
       brand: newBrand,
-      model: 'unknown',
+      model,
       batteryPct: 100,
       voltage: 0,
       online: true,
       position: { x: 0, y: 0, theta: 0 },
       status: 'idle',
       lastSeen: Date.now(),
+      deviceClass: newDeviceClass,
     }
+
+    // 机巢要给一个默认遥测壳，不然健康分和详情页没数据
+    if (newDeviceClass === 'uav_dock') {
+      state.dock = {
+        dockState: 'idle',
+        chargerTempC: 35,
+        chargerVoltageV: 24,
+        chargerCurrentA: 0,
+        doorState: 'closed',
+        liftPlatform: 'down',
+        weather: {
+          windSpeedMps: 0,
+          windGustMps: 0,
+          rainfallMm: 0,
+          temperatureC: 25,
+          humidityPct: 60,
+        },
+        hasUavInside: false,
+      }
+    }
+
+    // 起降场默认遥测
+    if (newDeviceClass === 'vertiport') {
+      state.vertiport = {
+        chargingPadState: 'available',
+        chargingCurrentA: 0,
+        fireSuppression: 'armed',
+        lighting: 'auto',
+        groundPowerVoltageV: 380,
+      }
+    }
+
     addRobot(state)
     setNewId('')
     setShowAdd(false)
@@ -107,7 +181,7 @@ export function Dashboard() {
         <h1 className="page-title">运维总览</h1>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn" onClick={handleExport} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Download size={14} /> 导出报告</button>
-          <button className="btn btn-primary" onClick={() => setShowAdd(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Plus size={14} /> 添加机器人</button>
+          <button className="btn btn-primary" onClick={() => setShowAdd(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Plus size={14} /> 添加设备</button>
         </div>
       </div>
 
@@ -120,33 +194,19 @@ export function Dashboard() {
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>添加机器人</div>
+            <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>添加设备</div>
             <button className="btn" style={{ padding: '2px 8px' }} onClick={() => setShowAdd(false)}>
               <X size={14} />
             </button>
           </div>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'end' }}>
-            <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'end', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 160px' }}>
               <label style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>
-                ROBOT ID
-              </label>
-              <input
-                className="input"
-                value={newId}
-                onChange={(e) => setNewId(e.target.value)}
-                placeholder="如 g1-002"
-                style={{ width: '100%' }}
-                onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-                autoFocus
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>
-                品牌
+                设备类
               </label>
               <select
-                value={newBrand}
-                onChange={(e) => setNewBrand(e.target.value as any)}
+                value={newDeviceClass}
+                onChange={(e) => handleDeviceClassChange(e.target.value as DeviceClass)}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -157,11 +217,46 @@ export function Dashboard() {
                   fontSize: 13,
                 }}
               >
-                <option value="unitree">宇树 (unitree)</option>
-                <option value="keenon">擎朗 (keenon)</option>
-                <option value="agibot">智元 (agibot)</option>
-                <option value="pudutech">普渡 (pudutech)</option>
+                {DEVICE_CLASS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
               </select>
+            </div>
+            <div style={{ flex: '1 1 160px' }}>
+              <label style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>
+                品牌 / 型号
+              </label>
+              <select
+                value={newBrand}
+                onChange={(e) => setNewBrand(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-base)',
+                  background: 'var(--bg-elev-2)',
+                  color: 'var(--text-primary)',
+                  fontSize: 13,
+                }}
+              >
+                {BRAND_BY_CLASS[newDeviceClass].map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ flex: '1 1 180px' }}>
+              <label style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>
+                设备 ID
+              </label>
+              <input
+                className="input"
+                value={newId}
+                onChange={(e) => setNewId(e.target.value)}
+                placeholder={newDeviceClass === 'ground_robot' ? '如 g1-002' : '如 dock-001'}
+                style={{ width: '100%' }}
+                onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+                autoFocus
+              />
             </div>
             <button
               className="btn btn-primary"
