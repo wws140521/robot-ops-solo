@@ -12,6 +12,7 @@ const defaultTheme: TenantTheme = {
   brandName: 'RobotOps',
 }
 
+// 把 hex 转成 rgb，解析失败就返回 null
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const match = hex.replace('#', '').match(/^([a-f\d]{6})$/i)
   if (!match) return null
@@ -19,6 +20,7 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 }
 }
 
+// 把主色写到根节点的 CSS 变量，顺便生成几个发光阴影变量
 function applyPrimaryColor(color: string) {
   const r = document.documentElement
   r.style.setProperty('--primary', color)
@@ -46,6 +48,7 @@ function applyPrimaryColor(color: string) {
 
 const ThemeCtx = createContext<TenantTheme>(defaultTheme)
 
+// 主题上下文提供者，切换主色时自动更新 CSS 变量
 export function ThemeProvider({
   theme,
   children,
@@ -62,4 +65,5 @@ export function ThemeProvider({
   return <ThemeCtx.Provider value={t}>{children}</ThemeCtx.Provider>
 }
 
+// 取当前主题
 export function useTheme() { return useContext(ThemeCtx) }

@@ -2,16 +2,13 @@ import { MeshReflectorMaterial } from '@react-three/drei'
 
 interface FloorProps {
   color?: string
-  /** 反射强度（0 = 无反射，2 = 强反射） */
+  // 反射强度，0 就是哑光，2 很镜面，默认 1.2 差不多
   reflectivity?: number
 }
 
-/**
- * 金属感地面
- * —— 使用 drei MeshReflectorMaterial 实现实时反射/镜像效果
- * —— 颜色随主题（深色深绿灰 / 浅色浅白灰）自动切换
- * —— 反射强度可通过 reflectivity 调整，0 时退回哑光
- */
+// 金属感地面，用 drei 的 MeshReflectorMaterial 做实时反射
+// 颜色跟着主题走：深主题深绿灰，浅主题浅白灰
+// reflectivity 为 0 时直接退回哑光材质，省点性能
 export function Floor({ color, reflectivity = 1.2 }: FloorProps = {}) {
   const baseColor = color ?? '#121916'
   const isMatte = reflectivity <= 0

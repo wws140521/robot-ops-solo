@@ -1,3 +1,4 @@
+// ui-kit 组件统一出口，新增组件记得在这挂一下
 export { RobotStatusCard } from './RobotStatusCard'
 export { AlertItem } from './AlertItem'
 export { BatteryGauge } from './BatteryGauge'

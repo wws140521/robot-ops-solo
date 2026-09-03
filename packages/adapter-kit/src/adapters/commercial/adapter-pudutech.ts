@@ -1,10 +1,8 @@
 import type { UnifiedRobotState, UnifiedAlert } from '../../types/unified'
 
-/**
- * 普渡（PuduTech）adapter —— stub
- * TODO: 接入真机后补全协议字段（当前仅有字段猜测，不接硬件时安全 fallback）
- * 参考字段（待 SDK 文档确认）：battery, voltage, x, y, theta, status
- */
+// 普渡（PuduTech）adapter —— 现在也是个 stub
+// SDK 文档还没到手，字段纯靠猜，先 fallback 别让页面崩
+// 接真机的时候再回来对齐协议
 export function adaptPudutech(raw: any, robotId: string): UnifiedRobotState {
   const batteryPct = raw?.battery ?? raw?.power ?? 0
   return {
@@ -25,6 +23,8 @@ export function adaptPudutech(raw: any, robotId: string): UnifiedRobotState {
   }
 }
 
+// 把普渡的状态码/字符串转成统一状态
+// 字符串多几个同义词，比如 standby / dock 都算
 function mapPudutechStatus(s?: string | number): UnifiedRobotState['status'] {
   if (typeof s === 'number') {
     switch (s) {
@@ -46,6 +46,7 @@ function mapPudutechStatus(s?: string | number): UnifiedRobotState['status'] {
   return 'idle'
 }
 
+// 普渡告警适配，没 code 也没 msg 就不算告警
 export function adaptPudutechAlert(raw: any, robotId: string): UnifiedAlert | null {
   const code = raw?.code ?? raw?.error
   const msg = raw?.msg ?? raw?.message ?? raw?.err

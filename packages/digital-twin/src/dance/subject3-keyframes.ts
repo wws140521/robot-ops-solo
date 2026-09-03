@@ -1,8 +1,6 @@
-/**
- * 科目三舞蹈关键帧数据（抖音版 15 秒循环）
- * 时间单位：秒 | 角度单位：弧度
- * 关节命名见 §2.1，须与 URDF 实际关节名一致（可用 JOINT_ALIAS 映射）
- */
+// 科目三舞蹈关键帧，抖音版 15 秒循环
+// 时间单位是秒，角度是弧度
+// 关节名必须和 URDF 里的一致，对不上就用 JOINT_ALIAS 映射一下
 export type G1JointName =
   | 'waist_yaw' | 'waist_pitch' | 'waist_roll'
   | 'left_hip_pitch' | 'left_hip_roll' | 'left_hip_yaw'

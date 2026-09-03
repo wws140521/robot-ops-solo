@@ -1,7 +1,5 @@
-/**
- * 播报事件全局状态
- * wsHub 收到 /speak 后写入 → 驱动 SpeakBubble 气泡 + AlertsPage 播报历史
- */
+// 全局播报状态，wsHub 收到 /speak 就往这里写
+// SpeakBubble 负责弹气泡，AlertsPage 负责记历史，都订阅这里
 import { create } from 'zustand'
 
 export interface SpeakEvent {

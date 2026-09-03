@@ -18,7 +18,8 @@ interface Props {
   zoom?: number
 }
 
-/** 低通滤波平滑位置 */
+// 简单低通滤波，让机器人位置别抖得太厉害
+// alpha 越小越平滑，但跟手会慢一点，0.2 是之前瞎调出来的
 function lowPass3(current: [number, number, number], prev: [number, number, number], alpha = 0.2): [number, number, number] {
   return [
     prev[0] + alpha * (current[0] - prev[0]),

@@ -8,12 +8,9 @@ interface HUDLabelProps {
   primaryColor: string
 }
 
-/**
- * 3D 空间锚定 HUD 标签
- * —— 用 drei Html 将 2D DOM 标签固定在 3D 机器人位置上方
- * —— distanceFactor 随距离自动缩放，避免远处标签过大
- * —— occlude="blending" 被物体遮挡时自动半透明
- */
+// 3D 空间里的 HUD 标签，钉在机器人头顶
+// 用 drei Html 把 2D DOM 固定到 3D 位置，远处会自动缩小
+// 被物体挡住时会半透明（occlude="blending"）
 export function HUDLabel({ position, robot, accentColor, primaryColor }: HUDLabelProps) {
   const statusColor =
     robot.status === 'error' ? '#ff3d71' :

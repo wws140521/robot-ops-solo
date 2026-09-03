@@ -9,10 +9,9 @@ interface SlamMapProps {
   wallInnerEmissive?: string
 }
 
-/**
- * 把栅格障碍渲染成 3D 墙体（俯视场地）。
- * 颜色完全走 CSS 变量派生 → 深浅主题 / 贴牌换肤自动同步。
- */
+// 把栅格地图里的障碍格子渲染成 3D 墙
+// 颜色走 CSS 变量，这样深浅主题或者贴牌换肤不用改代码
+// 四周的墙高一点，中间的矮一点，俯视时能看出场地轮廓
 export function SlamMap({
   data,
   wallPerimColor = '#2a3e34',

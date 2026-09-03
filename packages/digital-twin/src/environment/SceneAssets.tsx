@@ -1,17 +1,7 @@
-/**
- * SceneAssets.tsx
- * 真实工业场景建模 —— 替换原来的 SlamMap 网格墙
- *
- * 风格：工业实验室 / 仓储车间
- *   - 安全围栏（perimeter fence）
- *   - 充电桩 x 2
- *   - 设备架 x 2
- *   - 地面安全标线
- *   - 天花板吊梁（顶部横条）
- *
- * 全部用 three.js 原生几何体 + MeshStandardMaterial 程序化构建，
- * 颜色从 useScenePalette 取值，深/浅主题自动同步。
- */
+// SceneAssets.tsx
+// 工业实验室 / 仓储车间风格的场景道具
+// 目前先放了俩充电桩和地面安全标线，围栏设备架后面再补
+// 全部用 three.js 原生几何体拼，颜色从 useScenePalette 取，主题变了自动同步
 import * as THREE from 'three'
 import type { ScenePalette } from '../hooks/useScenePalette'
 

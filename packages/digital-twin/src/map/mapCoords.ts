@@ -8,11 +8,9 @@ export interface MapContext {
   center: { lng: number; lat: number }
 }
 
-/** 经纬度 → Three.js 世界坐标（GLCustomLayer 下 customCoords 返回值可直接喂给 Three）
- *  customCoords.lngLatsToCoords 返回 [east_meters, north_meters] — 仅 2D！
- *  Three 坐标系（GLCustomLayer 约定）：X=东, Y=上, Z=北
- *  → 映射 [east, north] → [X, altitude, Z] = [x, alt, z]
- */
+// 经纬度 → Three.js 世界坐标
+// customCoords.lngLatsToCoords 只返回 [east, north] 二维
+// Three 里约定 X 朝东、Y 朝上、Z 朝北，所以映射成 [x, 高度, z]
 export function lngLatToWorld(
   ctx: MapContext,
   lng: number,
@@ -23,7 +21,8 @@ export function lngLatToWorld(
   return [east, alt, north]
 }
 
-/** 路线折线（经纬度）→ Three.js 世界坐标 */
+// 路线折线（经纬度数组）→ Three.js 世界坐标
+// 默认抬高 0.5 米，避免贴地跟地图面片打架（z-fighting）
 export function routeToWorld(
   ctx: MapContext,
   route: { lng: number; lat: number }[],
@@ -35,7 +34,8 @@ export function routeToWorld(
   })
 }
 
-/** 动态更新原点 —— 避免远离中心浮点精度丢失 */
+// 动态更新 customCoords 原点
+// 机器人跑远了就切中心，不然浮点精度不够会抖
 export function updateMapCenter(ctx: MapContext, lng: number, lat: number) {
   ctx.customCoords.setCenter([lng, lat])
   ctx.center = { lng, lat }

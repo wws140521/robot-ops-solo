@@ -1,7 +1,5 @@
-/**
- * Neon Glass 风格健康分仪表盘（SVG 圆环）
- * 颜色：≥80 绿（OK）、≥60 黄（WARN）、<60 红（ERROR）
- */
+// 霓虹玻璃风格的健康分圆环
+// ≥80 绿、≥60 黄、<60 红，threshold 就这么定的
 interface Props {
   value: number
   size?: number

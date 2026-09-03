@@ -1,15 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 
-/**
- * 从全局 CSS 变量读取数字孪生 3D 场景配色
- * —— 保证场景风格与 UI 主题（深色/浅色+贴牌换肤）自动同步
- *   (Three.js mesh 颜色走 JS，不支持 var()，所以用 getComputedStyle 读一次)
- *
- * 2026-08-29 修复主题切换不更新：
- *   之前 useMemo 依赖 [] 导致 theme 切换后不重算。
- *   现在订阅 document.documentElement 的 data-theme / data-tenant 属性变化，
- *   触发 palette 重算 → SceneEnvironment memo 不命中 → 3D 场景重渲染。
- */
+// 从 CSS 变量读 3D 场景配色
+// Three.js 材质颜色是 JS 写的，不支持 var()，所以用 getComputedStyle 读一次
+// 监听 html 的 data-theme / data-tenant，主题切换就重新算，避免之前切主题不更新的坑
 export interface ScenePalette {
   bgTop: string
   bgBottom: string

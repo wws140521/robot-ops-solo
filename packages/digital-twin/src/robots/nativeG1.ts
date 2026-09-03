@@ -1,16 +1,7 @@
-/**
- * nativeG1.ts
- * 原生 Three.js（非 R3F）加载 Unitree G1 人形机器人
- *
- * 用于 AMap GLCustomLayer 等非 R3F 场景，直接往 THREE.Scene 里加 URDFRobot。
- * 自动处理脚底对齐地面 + 材质优化。
- *
- * 用法：
- *   import { loadG1ForScene } from 'digital-twin'
- *   const anchor = await loadG1ForScene(threeScene)
- *   anchor.position.set(x, y, z)
- *   anchor.rotation.y = heading
- */
+// nativeG1.ts
+// 原生 Three.js（非 R3F）加载 Unitree G1 人形机器人
+// 给 AMap GLCustomLayer 这种非 R3F 场景用，直接往 THREE.Scene 里挂 URDFRobot
+// 会自动把脚底对齐地面，材质也顺手调一下
 import * as THREE from 'three'
 import { parseURDF, loadRobot, type URDFRobot } from 'three-urdf'
 
@@ -22,18 +13,16 @@ let cachedRobot: URDFRobot | null = null
 let cachedAnchor: THREE.Group | null = null
 
 export interface G1LoadResult {
-  /** 外部控制用的 anchor group，移动/旋转它即可 */
+  // 外部操控用这个 group，移动/旋转它就行
   anchor: THREE.Group
-  /** URDFRobot 实例（驱动关节用 robot.setJointValues()） */
+  // URDFRobot 实例，关节动画用 robot.setJointValues()
   robot: URDFRobot
-  /** 身高（米） */
+  // 身高，单位米
   height: number
 }
 
-/**
- * 加载 G1 URDF + STL mesh 并添加到原生 Three.js scene。
- * 可重复调用（返回同一 anchor），不会重复加载或重复 add。
- */
+// 加载 G1 的 URDF + STL mesh，加到原生 Three.js scene
+// 可以重复调用，返回同一个 anchor，不会重复加载也不会重复 add
 export async function loadG1ForScene(scene: THREE.Scene): Promise<G1LoadResult> {
   // 命中缓存 → 直接返回
   if (cachedRobot && cachedAnchor) {

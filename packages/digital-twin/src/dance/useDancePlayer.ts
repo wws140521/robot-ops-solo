@@ -7,21 +7,19 @@ interface PlayState {
 }
 
 export interface DancePlayer {
-  /** 开始播放（循环） */
+  // 开始循环播放
   start: () => void
-  /** 停止，回到 idle */
+  // 停了，回到 idle
   stop: () => void
-  /** 每帧调用，传入当前秒（performance.now()/1000） */
+  // 每帧调一次，nowSec 传 performance.now()/1000 就行
   update: (nowSec: number) => void
-  /** 是否正在播放 */
+  // 当前是不是在播
   isActive: () => boolean
 }
 
-/**
- * 舞蹈播放器
- * @param onFrame 插值后的关节角度 + root 变换
- * @param frames  可选，自定义关键帧序列（默认科目三）
- */
+// 舞蹈播放器
+// onFrame 会拿到插值后的关节角度和 root 位移
+// frames 可以换成别的舞，默认就用科目三
 export function useDancePlayer(
   onFrame: (joints: Partial<Record<G1JointName, number>>, root?: DanceKeyframe['root']) => void,
   frames: DanceKeyframe[] = SUBJECT3_FRAMES,

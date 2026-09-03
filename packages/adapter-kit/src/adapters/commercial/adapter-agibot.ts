@@ -1,10 +1,8 @@
 import type { UnifiedRobotState, UnifiedAlert } from '../../types/unified'
 
-/**
- * 智元（Agibot）adapter —— stub
- * TODO: 接入真机后补全协议字段（当前仅有字段猜测，不接硬件时安全 fallback）
- * 参考字段（待 SDK 文档确认）：battery, voltage, x, y, theta, status
- */
+// 智元（Agibot）adapter —— 现在是个 stub
+// 真机 SDK 文档还没拿到，字段都是猜的，先保证不接硬件也能跑
+// 后面有文档了再补全协议字段
 export function adaptAgibot(raw: any, robotId: string): UnifiedRobotState {
   const batteryPct = raw?.battery ?? raw?.percentage ?? 0
   return {
@@ -25,6 +23,8 @@ export function adaptAgibot(raw: any, robotId: string): UnifiedRobotState {
   }
 }
 
+// 把智元的状态码/字符串转成统一状态
+// 数字和字符串都兼容，因为不同版本协议混着来
 function mapAgibotStatus(s?: string | number): UnifiedRobotState['status'] {
   if (typeof s === 'number') {
     switch (s) {
@@ -46,6 +46,7 @@ function mapAgibotStatus(s?: string | number): UnifiedRobotState['status'] {
   return 'idle'
 }
 
+// 智元告警适配，没 code 也没 msg 就不算告警
 export function adaptAgibotAlert(raw: any, robotId: string): UnifiedAlert | null {
   const code = raw?.code ?? raw?.error
   const msg = raw?.msg ?? raw?.message ?? raw?.err
