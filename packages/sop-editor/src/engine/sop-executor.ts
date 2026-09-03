@@ -1,6 +1,8 @@
-// 2026-08-18 实现 SOP 执行引擎，将 Graph JSON 转为实际行为，对应 SOP-HOTPOT 3.1
+// SOP 执行引擎，把画布的 Graph JSON 一步一步变成真实动作
+// 对应 SOP-HOTPOT 3.1，无真机时可以用 simulator 套壳跑
 import type { SopGraph, SopNode, SopEdge } from '../schema/sop-schema'
 
+// 执行上下文，动作实现由外部注入，真机和模拟器各自提供
 export interface ExecutorContext {
   robotId: string
   batteryPct: number
@@ -16,6 +18,7 @@ export interface ExecutorContext {
   charge: (minutes: number) => Promise<void>
 }
 
+// SOP 执行器本体
 export class SopExecutor {
   private nodeMap: Map<string, SopNode> = new Map()
   private edgeMap: Map<string, SopEdge[]> = new Map()
@@ -36,6 +39,7 @@ export class SopExecutor {
     })
   }
 
+  // 从入口节点开始跑，直到跑完或被人 stop
   async start(entryNodeId = 'boot') {
     this.running = true
     this.currentNodeId = entryNodeId
@@ -68,11 +72,13 @@ export class SopExecutor {
     }
   }
 
+  // 停止执行
   stop() {
     this.running = false
     console.log(`[SOP] 已停止`)
   }
 
+  // 根据节点类型执行对应动作
   private async executeNode(node: SopNode) {
     const { type } = node
     // 2026-08-19 联合类型宽松访问，兼容简版和完整版 SOP schema
@@ -138,6 +144,7 @@ export class SopExecutor {
         const fieldValue = this.getFieldValue(data.field)
         const passed = this.evalCondition(fieldValue, data.operator, data.value)
         console.log('[sop-exec] condition 节点:', { field: data.field, fieldValue, operator: data.operator, target: data.value, passed })
+        // 兼容简版 schema 的 trueNodeId/falseNodeId 与完整版的 onTrue/onFalse
         this.currentNodeId = passed
           ? (data.onTrue ?? data.trueNodeId ?? null)
           : (data.onFalse ?? data.falseNodeId ?? null)
@@ -152,19 +159,21 @@ export class SopExecutor {
     }
   }
 
+  // 找下一个节点，条件分支看 label，普通节点走默认边
   private findNextNode(node: SopNode): string | null {
     const edges = this.edgeMap.get(node.id) ?? []
     if (edges.length === 0) {
       console.log('[sop-exec] findNextNode: 无出边, 流程结束:', node.id)
       return null
     }
-    // 2026-08-18 优先选无 label 的默认边，其次按条件选
+    // 条件节点通常有两条带 label 的出边（如 <30% / ≥30%），普通节点留一条无 label 默认边
     const defaultEdge = edges.find((e) => !e.label)
     const next = (defaultEdge ?? edges[0]).target
     console.log('[sop-exec] findNextNode:', { from: node.id, candidates: edges.map(e => e.target), selected: next })
     return next
   }
 
+  // 从 context 里取条件判断需要的字段值
   private getFieldValue(field: string): number {
     switch (field) {
       case 'batteryPct': return this.ctx.batteryPct
@@ -173,6 +182,7 @@ export class SopExecutor {
     }
   }
 
+  // 简单条件判断，支持 < <= > >= == 这几种
   private evalCondition(val: number, op: string, target: number): boolean {
     switch (op) {
       case '<': case 'lt': return val < target
@@ -184,6 +194,7 @@ export class SopExecutor {
     }
   }
 
+  // 把 HH:mm 字符串转成 Date，用于 loop 的时间范围判断
   private parseTime(timeStr: string, base: Date): Date {
     const [h, m] = timeStr.split(':').map(Number)
     const d = new Date(base)

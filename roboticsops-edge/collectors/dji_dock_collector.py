@@ -1,12 +1,11 @@
-"""
-DJI Dock 采集器：通过大疆开放 API（HTTP / WebSocket）拉取机巢与无人机状态，
-归一化为 adapter-kit 可消费的 raw dict，再由边缘侧转换后发布 MQTT。
-"""
+# DJI Dock 采集器，通过大疆开放 API 拉取机巢和无人机状态
+# 归一化成 adapter-kit 能吃的 raw dict，再由边缘侧转 MQTT 发出去
 import time
 import requests
 from typing import Optional
 
 
+# 大疆机场采集器
 class DJIDockCollector:
     def __init__(self, dock_sn: str, api_base: str, app_key: str, app_secret: str):
         self.dock_sn = dock_sn
@@ -14,9 +13,10 @@ class DJIDockCollector:
         self.app_key = app_key
         self.app_secret = app_secret
         self._token: Optional[str] = None
+        # 提前 60 秒刷新 token，避免边界时刻请求因过期被拒绝
         self._token_expire = 0
 
-    # —— 鉴权（示意，实际按大疆开放平台文档）——
+    # 鉴权，示意代码，生产按大疆开放平台文档来
     def _get_token(self) -> str:
         if self._token and time.time() < self._token_expire - 60:
             return self._token
@@ -29,25 +29,28 @@ class DJIDockCollector:
         self._token_expire = time.time() + data.get("expires_in", 7200)
         return self._token
 
+    # 带 token 的 GET 请求
     def _request(self, path: str) -> dict:
         headers = {"Authorization": f"Bearer {self._get_token()}"}
         resp = requests.get(f"{self.api_base}{path}", headers=headers, timeout=5)
         resp.raise_for_status()
         return resp.json()
 
+    # 采集并归一化成 adapter-kit dji-dock 输入的 raw 结构
     def collect(self) -> dict:
-        """归一化为 adapter-kit dji-dock 输入的 raw 结构"""
         dock = self._request(f"/v1/docks/{self.dock_sn}/state")
         uav = None
         try:
             uav = self._request(f"/v1/docks/{self.dock_sn}/uav")
         except Exception:
-            pass  # 机巢内无无人机时忽略
+            # 机巢内无无人机时该接口通常 404/空响应，忽略即可；uav 字段留 None
+            pass
 
         return {
             "sn": self.dock_sn,
             "product_version": dock.get("product_version"),
             "dock_state": dock.get("state"),
+            # 充电器字段缺失时给 0，adapter-kit 侧会再用默认值兜底
             "charger_temperature_c": dock.get("charger", {}).get("temperature_c", 0),
             "charger_voltage_v": dock.get("charger", {}).get("voltage_v", 0),
             "charger_current_a": dock.get("charger", {}).get("current_a", 0),
@@ -60,6 +63,7 @@ class DJIDockCollector:
             "temperature": dock.get("weather", {}).get("temperature_c", 0),
             "humidity": dock.get("weather", {}).get("humidity_pct", 0),
             "uav_inside": dock.get("uav_inside", False),
+            # 机巢内有无人机时才填充 UAV 遥测；None 会让 adapter-kit 跳过 uav 字段
             "uav": uav and {
                 "battery_percent": uav.get("battery", {}).get("percent", 0),
                 "battery_cycles": uav.get("battery", {}).get("cycles", 0),
@@ -72,8 +76,9 @@ class DJIDockCollector:
         }
 
 
+# 本地 mock 数据，不连真机，给测试和离线验证用
+# 数据覆盖常见场景：充电器 45℃、电池循环 132 次、图传-62dBm
 def mock_collect() -> dict:
-    """本地 mock 数据（不连真机），用于单元测试与离线验证"""
     return {
         "sn": "SN_MOCK_DOCK_001",
         "product_version": "Dock 2",

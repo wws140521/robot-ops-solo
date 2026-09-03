@@ -1,8 +1,5 @@
-/**
- * 实时趋势图（Chart.js Line）
- * 每 5 秒滚一个点，最多保留 30 个点
- * 支持：温度 / 负载率 / 电流 / 健康分
- */
+// 实时趋势图，用 Chart.js 画折线
+// 每来一帧 WS 数据就滚一个点，最多保留 30 个点，支持温度/负载/电流/健康分
 
 import { useEffect, useRef, useState } from 'react'
 import { Line } from 'react-chartjs-2'
@@ -43,11 +40,12 @@ export function TrendChart({
   height = 120,
 }: Props) {
   const cfg = METRIC_CONFIG[metric] || METRIC_CONFIG.temp_c
+  // 用 ref 缓存历史数据避免每次 render 丢失；tick 仅用于触发重绘
   const historyRef = useRef<number[]>([])
   const labelsRef = useRef<string[]>([])
   const [tick, setTick] = useState(0)
 
-  // 提取当前值
+  // health_score 取所有关节均值；单关节指标取指定关节，无数据时返回 0 避免折线异常
   const getValue = (): number => {
     if (metric === 'health_score') {
       const joints = robot.industrial?.joints
@@ -60,6 +58,7 @@ export function TrendChart({
     return (joint as any)[metric] ?? 0
   }
 
+  // robot.lastSeen 每次 WS 更新都会变化，以此作为采样节拍；数据点超过上限时丢弃最旧点
   useEffect(() => {
     const val = getValue()
     const time = new Date().toLocaleTimeString('zh-CN', { hour12: false })
@@ -119,7 +118,7 @@ export function TrendChart({
     ? historyRef.current[historyRef.current.length - 1]
     : null
 
-  // tick 只是触发重渲染，不用直接
+  // tick 仅用于触发重渲染，不参与业务计算
   void tick
 
   return (

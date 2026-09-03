@@ -1,7 +1,5 @@
-/**
- * 品牌特有数据扩展面板
- * 显示工业机器人品牌专有字段（R 寄存器、安全门状态等）
- */
+// 品牌特有数据扩展面板
+// 显示工业机器人品牌专有字段，比如 FANUC 的 R 寄存器、KUKA 的安全门状态这些
 
 import { getBrandConfig } from '../lib/brandRegistry'
 
@@ -10,7 +8,7 @@ interface Props {
   brand: string
 }
 
-// 不同品牌的扩展字段中文名映射
+// 各品牌扩展字段的中文名映射，key 小写品牌名
 const FIELD_LABELS: Record<string, Record<string, string>> = {
   fanuc: {
     r_register_200: 'R 寄存器 #200',
@@ -37,6 +35,7 @@ const FIELD_LABELS: Record<string, Record<string, string>> = {
   },
 }
 
+// 扩展面板主组件，没数据就提示空，有数据就两列铺开
 export function ExtensionPanel({ extensions, brand }: Props) {
   const brandKey = brand.toLowerCase()
   const labels = FIELD_LABELS[brandKey] || {}

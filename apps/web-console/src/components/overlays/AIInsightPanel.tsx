@@ -1,8 +1,5 @@
-/**
- * AI 告警摘要面板
- * 嵌入 RobotsPage 侧边栏
- * 调用 AI SaaS → 显示中文摘要 + 建议
- */
+// AI 告警摘要面板，嵌在机器人详情侧边栏
+// 调 AI SaaS 接口拿中文摘要和排查建议
 import { useState, useEffect } from 'react'
 import { fetchAIInsight, type AIInsightResult } from '../../lib/aiSaaSApi'
 import type { IndustrialExtension } from 'robot-adapter-kit'
@@ -12,11 +9,13 @@ interface Props {
   industrial?: IndustrialExtension
 }
 
+// AI 分析面板，只有工业机器人才有数据，别的牌子直接显示不可用
 export function AIInsightPanel({ robotId, industrial }: Props) {
   const [insight, setInsight] = useState<AIInsightResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // industrial 有值就去拉 AI 分析
   useEffect(() => {
     if (!industrial) return
     setLoading(true)
@@ -106,6 +105,7 @@ export function AIInsightPanel({ robotId, industrial }: Props) {
   )
 }
 
+// 小指标标签：健康分 / 剩余寿命 / 置信度
 function Metric({ label, value, color }: { label: string; value: string | number; color: string }) {
   return (
     <div style={{

@@ -8,6 +8,7 @@ import type { UnifiedRobotState } from 'robot-adapter-kit'
 import { Download, Plus, Bot, BatteryCharging, Bell, LayoutGrid, CheckCircle2, X } from 'lucide-react'
 import { getBrandConfig } from '../lib/brandRegistry'
 
+// 运维总览 Dashboard
 export function Dashboard() {
   const navigate = useNavigate()
   const { robots, onlineCount, addRobot } = useRobotStore()
@@ -25,6 +26,7 @@ export function Dashboard() {
   const [newId, setNewId] = useState('')
   const [newBrand, setNewBrand] = useState<'unitree' | 'keenon' | 'agibot' | 'pudutech'>('unitree')
 
+  // 导出机器人状态 CSV
   const handleExport = () => {
     const ts = new Date().toISOString().replace(/[:.]/g, '-')
     const rows = [
@@ -46,6 +48,7 @@ export function Dashboard() {
     URL.revokeObjectURL(url)
   }
 
+  // 手动添加一个机器人
   const handleAdd = () => {
     if (!newId.trim()) return
     const state: UnifiedRobotState = {
@@ -64,12 +67,14 @@ export function Dashboard() {
     setShowAdd(false)
   }
 
-  // 2026-08-18 初版健康分：电量*0.6+在线*20+无错误*20
+  // 2026-08-18 初版健康分：电量占 60%（移动机器人核心指标），在线与无错误各 20%
   // TODO: 加入温度衰减系数，高温环境电池权重从 0.3 降到 0.15
+  // 简易健康分：电量占 60%，在线和无错误各 20%
   const calcHealth = (r: UnifiedRobotState): number => {
     let score = r.batteryPct * 0.6
     if (r.online) score += 20
     if (!r.errorCode) score += 20
+    // status=error 时保底 20 分，避免健康分看起来还“不错”
     if (r.status === 'error') score = Math.max(20, score - 30)
     const result = Math.min(100, Math.round(score))
     console.log('[health] 健康分计算:', { robotId: r.robotId, battery: r.batteryPct, online: r.online, score: result })
@@ -84,7 +89,7 @@ export function Dashboard() {
     desc: `[${a.code}] ${a.robotId} 告警`,
   }))
 
-  // 如果时间轴为空，显示最近机器人活动
+  // 时间轴为空时填充最近 3 台机器人状态，避免页面空白；分钟用随机数仅作占位展示
   if (timelineItems.length === 0) {
     timelineItems.push(
       ...robotList.slice(0, 3).map((r, i) => ({
@@ -383,6 +388,7 @@ export function Dashboard() {
   )
 }
 
+// KPI 统计卡片
 function KpiCard({
   label,
   value,
@@ -518,7 +524,7 @@ function KpiCard({
   )
 }
 
-/* 纯 SVG sparkline，零新增依赖 */
+// 纯 SVG 画的迷你趋势图，零依赖
 function Sparkline({ data, color }: { data: number[]; color: string }) {
   const w = 64
   const h = 24

@@ -1,6 +1,8 @@
-// 2026-08-18 实现 SOP 模拟器，无真机也能跑，对应 SOP-HOTPOT 3.2
-// 2026-08-19 增强：内置模拟时钟（18:00 起步）+ 加大掉电速率，验证清单 10 条全部可观测
+// SOP 模拟器，无真机也能跑，对应 SOP-HOTPOT 3.2
+// 内置模拟时钟从 18:00 起步，掉电速率调高点，方便看低电回充分支
 import { SopExecutor, type ExecutorContext } from './sop-executor'
+
+// 模拟器事件回调，UI 可以订阅这些事件做展示
 import type { SopGraph, Waypoint } from '../schema/sop-schema'
 
 export interface SimEvents {
@@ -13,6 +15,7 @@ export interface SimEvents {
   onState?: (state: { batteryPct: number; pos: { x: number; y: number }; simTime: Date }) => void
 }
 
+// 创建一个模拟器实例，返回 start/stop 方法
 export function createSimulator(graph: SopGraph, events: SimEvents) {
   let batteryPct = 85
   let trayWeight = 500

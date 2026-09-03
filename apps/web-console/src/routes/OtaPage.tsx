@@ -6,7 +6,7 @@ import { useOtaStore, triggerMockFail, type OtaState } from '../stores/otaStore'
 import { useRobotStore } from '../stores/robotStore'
 import { Download, CheckCircle, XCircle, Loader, AlertTriangle, RefreshCw, Eraser } from 'lucide-react'
 
-// 2026-08-21 状态 → 颜色/图标映射（前端开发文档第 5 节）
+// OTA 状态对应的图标、颜色、中文标签
 const STATE_CONFIG: Record<OtaState, { color: string; icon: typeof Download; label: string }> = {
   idle:        { color: 'var(--text-tertiary)',  icon: Download,     label: '待升级' },
   pending:    { color: 'var(--status-working)', icon: Loader,        label: '等待响应' },
@@ -16,6 +16,7 @@ const STATE_CONFIG: Record<OtaState, { color: string; icon: typeof Download; lab
   fail:       { color: 'var(--status-error)',   icon: XCircle,       label: '升级失败' },
 }
 
+// 进度条组件，根据状态给颜色
 function ProgressBar({ value, state }: { value: number; state: OtaState }) {
   const color = STATE_CONFIG[state].color
   return (
@@ -45,6 +46,7 @@ function ProgressBar({ value, state }: { value: number; state: OtaState }) {
   )
 }
 
+// 单台设备的 OTA 状态卡片
 function OtaStatusCard({ robotId }: { robotId: string }) {
   const status = useOtaStore((s) => s.statuses[robotId])
   const robot = useRobotStore((s) => s.robots[robotId])
@@ -181,6 +183,7 @@ function OtaStatusCard({ robotId }: { robotId: string }) {
   )
 }
 
+// 升级日志列表，按时间倒序展示
 function OtaLogList() {
   const logs = useOtaStore((s) => s.logs)
   const clearLogs = useOtaStore((s) => s.clearLogs)
@@ -249,6 +252,7 @@ function OtaLogList() {
   )
 }
 
+// OTA 升级管理页：设备卡片 + 批量升级 + 日志
 export function OtaPage() {
   const robots = useRobotStore((s) => s.robots)
   const statuses = useOtaStore((s) => s.statuses)
@@ -261,7 +265,7 @@ export function OtaPage() {
   const successCount = Object.values(statuses).filter((s) => s.state === 'success').length
   const failCount = Object.values(statuses).filter((s) => s.state === 'fail').length
 
-  // 2026-08-21 批量升级：仅对通过前置校验的设备下发
+  // 批量升级：只给通过前置校验的设备下发
   const batchUpgrade = () => {
     const store = useOtaStore.getState()
     robotIds.forEach((id) => {

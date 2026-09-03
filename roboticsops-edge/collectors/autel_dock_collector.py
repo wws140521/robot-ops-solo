@@ -1,19 +1,18 @@
-"""
-Autel / 科比特 / 普宙 机巢采集器
-输入：MAVLink 或厂商 REST 归一化后的数据
-"""
+# Autel / 科比特 / 普宙 机巢采集器
+# 国产机巢协议差异大，边缘侧先统一成 raw dict，再交给 adapter-kit 做 UDM 映射
 from typing import Optional
 
 
+# Autel 机巢采集器
 class AutelDockCollector:
     def __init__(self, dock_id: str, api_base: str, api_key: Optional[str] = None):
         self.dock_id = dock_id
         self.api_base = api_base.rstrip('/')
         self.api_key = api_key
 
+    # 实际请求厂商 API 或监听 MAVLink，当前 mock 点数据
     def collect(self) -> dict:
-        # 实际场景：请求厂商 API 或监听 MAVLink
-        # 此处返回 mock 结构供本地验证
+        # 实际场景：请求厂商 API 或监听 MAVLink；当前 mock 数值刻意覆盖充电器 48℃（不过温）与电池循环 210 次
         return {
             "id": self.dock_id,
             "model": "Generic MAVLink Dock",
@@ -37,6 +36,7 @@ class AutelDockCollector:
         }
 
 
+# 返回 mock 数据，给主循环和本地验证用
 def mock_collect() -> dict:
     return AutelDockCollector("SN_AUTEL_DOCK_001", "https://api.example.com").collect()
 

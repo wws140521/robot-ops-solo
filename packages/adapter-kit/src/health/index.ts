@@ -1,7 +1,5 @@
-/**
- * 健康分统一入口
- * 根据 device_class 路由到对应算法
- */
+// 健康分统一入口
+// 根据 device_class 路由到对应算法
 import type { UnifiedRobotState } from '../types/unified'
 import { calcDockHealthScore } from './dock-health'
 import { calcVertiportHealthScore } from './vertiport-health'
@@ -11,12 +9,9 @@ export type { DockHealthWeights } from './dock-health'
 export { calcVertiportHealthScore, VERTIPORT_WEIGHTS } from './vertiport-health'
 export type { VertiportHealthWeights } from './vertiport-health'
 
-/**
- * 计算设备健康分
- * - uav_dock → 机巢算法
- * - vertiport → 起降场算法
- * - ground_robot / 默认 → 返回已有 industrial 关节健康分平均值或 85
- */
+// 计算设备健康分
+// uav_dock 走机巢算法，vertiport 走起降场算法，
+// ground_robot 默认取 industrial 关节健康分平均值，没数据就按 85 算
 export function calcHealthScore(state: UnifiedRobotState): number {
   switch (state.deviceClass) {
     case 'uav_dock':

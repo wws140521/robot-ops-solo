@@ -4,7 +4,7 @@ import { getAMap } from './amap'
 
 export interface RoutePoint { lng: number; lat: number; floor?: number }
 
-/** 高德步行路径规划 —— 室外机器人首选（遵守人行道） */
+// 高德步行路径规划，室外机器人首选，走人行道
 export async function planWalking(from: RoutePoint, to: RoutePoint): Promise<RoutePoint[]> {
   const AMap = await getAMap()
   return new Promise((resolve, reject) => {
@@ -25,7 +25,7 @@ export async function planWalking(from: RoutePoint, to: RoutePoint): Promise<Rou
   })
 }
 
-/** 多点串联路线（A→B→C） */
+// 多点串联路线，A→B→C 一段段拼起来
 export async function planMultiWaypoints(waypoints: RoutePoint[]): Promise<RoutePoint[]> {
   const all: RoutePoint[] = []
   for (let i = 0; i < waypoints.length - 1; i++) {
@@ -35,7 +35,7 @@ export async function planMultiWaypoints(waypoints: RoutePoint[]): Promise<Route
   return all
 }
 
-/** 简化折点（Douglas-Peucker 的简化版，保留拐点） */
+// 简化路径点，默认 0.0001° 约 10m，减少 WS 发送频率
 export function simplifyRoute(points: RoutePoint[], minDist = 0.0001): RoutePoint[] {
   if (points.length <= 2) return points
   const out: RoutePoint[] = [points[0]]

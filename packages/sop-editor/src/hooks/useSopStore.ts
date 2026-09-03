@@ -1,6 +1,8 @@
+// SOP 画布的 zustand store，管节点、边、选中态和编辑态
 import { create } from 'zustand'
 import type { SopNode, SopEdge } from '../schema/sop-schema'
 
+// store 类型定义
 interface SopStore {
   nodes: SopNode[]
   edges: SopEdge[]
@@ -19,6 +21,7 @@ interface SopStore {
   reset: () => void
 }
 
+// 画布默认给一个 move 节点，避免空画布时用户无从下手
 const initialNodes: SopNode[] = [
   {
     id: 'start',
@@ -28,6 +31,7 @@ const initialNodes: SopNode[] = [
   },
 ]
 
+// store 实例
 export const useSopStore = create<SopStore>((set) => ({
   nodes: initialNodes,
   edges: [],
@@ -41,6 +45,7 @@ export const useSopStore = create<SopStore>((set) => ({
     set((s) => ({
       nodes: s.nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...data } } : n)),
     })),
+  // 删除节点时同步清理其出入边，防止画布残留悬空连线
   removeNode: (id) =>
     set((s) => ({
       nodes: s.nodes.filter((n) => n.id !== id),

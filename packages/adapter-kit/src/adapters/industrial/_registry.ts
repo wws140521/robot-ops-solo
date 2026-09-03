@@ -1,7 +1,5 @@
-/**
- * 工业品牌注册表
- * 新增品牌只需在此注册 + 创建 adapter 文件
- */
+// 工业品牌注册表，fanuc/kuka/estun/yaskawa 这几个老家伙
+// 新来的品牌先写 adapter 再注册，别让野协议数据混进来
 import type { UnifiedRobotState, UnifiedAlert } from '../../types/unified';
 import { adaptFanuc } from './adapter-fanuc';
 import { adaptKuka } from './adapter-kuka';

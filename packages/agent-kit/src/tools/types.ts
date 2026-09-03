@@ -1,6 +1,5 @@
-/**
- * Agent Tool 基础类型
- */
+// Agent Tool 基础类型，和 OpenAI / Anthropic 的 function calling schema 对齐
+// description 写得好不好直接影响模型会不会乱选工具
 export interface ToolParameterSchema {
   type: string
   description?: string

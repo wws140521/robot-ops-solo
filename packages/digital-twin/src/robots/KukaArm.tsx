@@ -1,8 +1,6 @@
-/**
- * KUKA 6 轴工业机器人 — 关节树版本
- * 结构与 FANUC 相同：J1(Y) → J2(X) → J3(X) → J4(X) → J5(Y) → J6(X)
- * KUKA 经典白色涂装
- */
+// KUKA 6 轴工业机器人 — 关节树版本
+// 结构和 FANUC 一样：J1(Y) → J2(X) → J3(X) → J4(X) → J5(Y) → J6(X)
+// KUKA 经典白色涂装，底座改成方形
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -33,7 +31,7 @@ function getJointColor(loadPct: number, base: string): string {
   return base
 }
 
-/** 与 FANUC 相同的关节枢轴+连杆结构 */
+// 和 FANUC 一样的关节枢轴+连杆结构，懒得再抽公共组件了
 function JointWithLink({
   position,
   axis,

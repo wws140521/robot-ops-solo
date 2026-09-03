@@ -1,24 +1,25 @@
-/**
- * 无人机机巢卡片
- */
+// 无人机机巢卡片，展示机巢状态 + 无人机电量这些玩意
 import type { UnifiedRobotState } from 'robot-adapter-kit'
 
 interface DockCardProps {
   device: UnifiedRobotState
 }
 
+// 健康分颜色，跟别处一个套路：80以上绿，60以上黄，剩下红
 function healthColor(score: number): string {
   if (score >= 80) return 'var(--status-online)'
   if (score >= 60) return 'var(--alert-warn)'
   return 'var(--status-error)'
 }
 
+// 机巢状态颜色，error/充电/在线 三种情况
 function statusColor(status: string): string {
   if (status === 'error') return 'var(--status-error)'
   if (status === 'charging') return 'var(--status-charging)'
   return 'var(--status-online)'
 }
 
+// 机巢卡片主组件，把 device 里的 dock/uav 数据摊开展示
 export function DockCard({ device }: DockCardProps) {
   const { dock, uav } = device
   const score = device.batteryPct ?? 85

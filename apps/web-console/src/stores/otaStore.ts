@@ -1,10 +1,9 @@
-// 2026-08-21 创建 OTA 状态 store，管理设备升级状态机 + 模拟降级引擎
-// 参考《轻量OTA开发文档》状态机定义 + 《前端开发文档》5 态映射
+// OTA 状态 store：管理设备升级状态机 + 模拟降级引擎
 import { create } from 'zustand'
 import { useRobotStore } from './robotStore'
 import type { UnifiedRobotState } from 'robot-adapter-kit'
 
-// 2026-08-21 后端 9 态 → 前端 6 态映射（前端开发文档第 5 节）
+// 后端 9 态 → 前端 6 态映射
 export type OtaState =
   | 'idle'        // 待升级
   | 'pending'     // 等待设备响应
@@ -13,17 +12,18 @@ export type OtaState =
   | 'success'     // 升级成功
   | 'fail'        // 升级失败
 
-// 后端上报的原始状态枚举（开发文档第三章）
+// 后端 MQTT 上报的原始状态
 export type BackendState =
   | 'IDLE' | 'DOWNLOADING' | 'VERIFYING' | 'INSTALLING'
   | 'REBOOTING' | 'HEALTH_CHECK' | 'SUCCESS' | 'FAILED' | 'ROLLED_BACK'
 
+// 后端状态转前端状态，下载+验签合并为"下载中"，烧录+重启+健康检查合并为"升级中"
 const BACKEND_TO_FRONT: Record<BackendState, OtaState> = {
   IDLE: 'idle',
   DOWNLOADING: 'downloading',
-  VERIFYING: 'downloading',  // 下载+验签合并为前端"下载中"
+  VERIFYING: 'downloading',
   INSTALLING: 'upgrading',
-  REBOOTING: 'upgrading',    // 烧录+重启合并为前端"升级中"
+  REBOOTING: 'upgrading',
   HEALTH_CHECK: 'upgrading',
   SUCCESS: 'success',
   FAILED: 'fail',
@@ -48,13 +48,13 @@ export interface OtaLogEntry {
   level: 'info' | 'warn' | 'error'
 }
 
-// 2026-08-21 前置校验规则（前端开发文档第 4 节，P0 强制）
+// 前置校验结果
 export interface PreCheckResult {
   ok: boolean
   reasons: string[]
 }
 
-const BATTERY_THRESHOLD = 30  // 最低电量 30%
+const BATTERY_THRESHOLD = 30  // 电量低于 30% 不让升级
 const TASK_BLOCKING_STATES: UnifiedRobotState['status'][] = ['working', 'moving', 'error']
 
 interface OtaStore {
@@ -73,9 +73,10 @@ interface OtaStore {
   clearLogs: () => void
 }
 
-// 2026-08-21 模拟降级引擎：无真机时前端自驱状态机（前端开发文档第 8 节）
+// mock 模式下前端自驱状态机，没有真机 MQTT 时用来演示
 const mockTimers: Record<string, number[]> = {}
 
+// 清掉某个机器人的所有 mock 定时器
 function clearMockTimers(robotId: string) {
   const timers = mockTimers[robotId]
   if (timers) {
@@ -84,6 +85,7 @@ function clearMockTimers(robotId: string) {
   }
 }
 
+// 启动 mock 升级流程，假装下载、验签、烧录、成功
 function startMockUpgrade(
   robotId: string,
   targetVersion: string,
@@ -139,7 +141,7 @@ function startMockUpgrade(
   }, 1000))
 }
 
-// 2026-08-21 模拟失败场景（可手动触发，演示容错交互）
+// 手动触发 mock 失败，演示升级失败交互
 export function triggerMockFail(robotId: string) {
   clearMockTimers(robotId)
   const store = useOtaStore.getState()
@@ -153,7 +155,7 @@ export const useOtaStore = create<OtaStore & { setStatuses: (robotId: string, pa
   logs: [],
   availableVersion: 'v1.3.2',
 
-  // 2026-08-21 前置校验：在线+电量≥30%+非任务中+无正在升级（前端开发文档第 4 节）
+  // 前置校验：在线 + 电量≥30% + 非任务中 + 无正在升级
   preCheck: (robotId: string) => {
     const robot = useRobotStore.getState().robots[robotId]
     const reasons: string[] = []
@@ -176,12 +178,12 @@ export const useOtaStore = create<OtaStore & { setStatuses: (robotId: string, pa
       reasons.push('已有正在进行的升级任务')
     }
 
-    // TODO: 加入运行时间窗口校验（夜间静默升级 02:00-05:00）
+    // 后面可以加运行时间窗口校验，比如夜间静默升级
     console.log('[otaStore] preCheck:', { robotId, ok: reasons.length === 0, reasons })
     return { ok: reasons.length === 0, reasons }
   },
 
-  // 2026-08-21 下发升级指令：mock 模式下自驱状态机
+  // 下发升级指令，mock 模式走前端自驱，真实环境走 MQTT
   startUpgrade: (robotId: string, targetVersion?: string) => {
     const version = targetVersion ?? get().availableVersion
     const check = get().preCheck(robotId)
@@ -224,7 +226,7 @@ export const useOtaStore = create<OtaStore & { setStatuses: (robotId: string, pa
     }, (r, m, l) => get().addLog(r, m, l))
   },
 
-  // 2026-08-21 从 MQTT 接收后端真实状态上报
+  // 从 MQTT 接收后端真实状态上报，覆盖 mock 定时器
   updateFromBackend: (robotId, backendState, progress, message, campaignId) => {
     const frontState = BACKEND_TO_FRONT[backendState]
     set((s) => {

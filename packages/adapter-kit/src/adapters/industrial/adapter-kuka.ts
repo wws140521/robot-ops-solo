@@ -1,6 +1,4 @@
-/**
- * KUKA OPC UA → UnifiedRobotState 适配器
- */
+// KUKA OPC UA → UnifiedRobotState 适配器
 import type { UnifiedRobotState, UnifiedAlert } from '../../types/unified';
 import type {
   JointTelemetry,
@@ -17,6 +15,7 @@ const KUKA_ALARM_MAP: Record<string, { udm_code: string; severity: AlarmSeverity
   KSS15202: { udm_code: 'BREAKER_OPEN', severity: 'critical', zh_desc: '断路器断开' },
 };
 
+// KUKA OPC UA 原始报文 → UDM，告警码按 KUKA_ALARM_MAP 翻译
 export function adaptKuka(
   raw: any
 ): { state: UnifiedRobotState; alerts: UnifiedAlert[] } {

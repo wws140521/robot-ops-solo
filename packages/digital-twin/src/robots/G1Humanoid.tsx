@@ -1,23 +1,17 @@
-/**
- * G1Humanoid.tsx
- * 宇树 G1 29 DOF 人形机器人 — URDF + STL 真实模型版
- *
- * 使用 three-urdf 加载官方 URDF + STL mesh 资源：
- *   - parseURDF: 解析 URDF XML → RobotModel
- *   - loadRobot:  加载 STL mesh → URDFRobot (Three.js Group 子类)
- *   - setJointValues: 批量设置关节角度
- *
- * 坐标系：three-urdf 自动处理 URDF(Z-up) → Three.js(Y-up) 转换
- *
- * 数据源：
- *   - URDF: /models/g1/g1_29dof.urdf
- *   - Mesh: /models/g1/meshes/*.STL
- *   - Package Map: { 'g1_description': '/models/g1' }
- *
- * 29 DOF = 腰部3 + 双臂14 + 双腿12
- *
- * L1 几何校验（Box3）：身高 ≈ 1.30m，肩宽 ≈ 0.42m
- */
+// G1Humanoid.tsx
+// 宇树 G1 29 DOF 人形机器人 — URDF + STL 真实模型版
+//
+// 用 three-urdf 加载官方 URDF + STL mesh：
+//   parseURDF 解析 XML，loadRobot 加载 STL，setJointValues 批量设关节角
+// three-urdf 会自动处理 URDF(Z-up) → Three.js(Y-up) 的坐标转换
+//
+// 资源路径：
+//   URDF: /models/g1/g1_29dof.urdf
+//   Mesh: /models/g1/meshes/*.STL
+//   Package Map: { 'g1_description': '/models/g1' }
+//
+// 29 DOF = 腰部3 + 双臂14 + 双腿12
+// L1 几何校验（Box3）：身高大概 1.30m，肩宽大概 0.42m，差太多就要怀疑模型是不是加载错了
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -83,9 +77,9 @@ export interface G1HumanoidProps {
   position: [number, number, number]
   rotation: [number, number, number]
   scale?: number
-  /** 模型加载完成回调 */
+  // 模型加载完成回调
   onLoaded?: (robot: URDFRobot) => void
-  /** 加载失败回调 */
+  // 加载失败回调
   onError?: (err: Error) => void
 }
 

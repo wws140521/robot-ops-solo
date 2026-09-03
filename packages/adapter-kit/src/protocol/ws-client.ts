@@ -1,4 +1,5 @@
-// 2026-08-18 自研 WS 客户端，支持指数退避重连+心跳+多 topic 订阅
+// 自研 WebSocket 客户端，带指数退避重连和心跳
+// 2026-08-28 加了个 disposed 标志，主动断开之后别再偷偷重连，mock 端被孤儿连接搞怕了
 export class RobotWSClient {
   private ws: WebSocket | null = null
   private reconnectTimer?: number
@@ -15,6 +16,7 @@ export class RobotWSClient {
     private onStatusChange?: (online: boolean) => void
   ) {}
 
+  // 开始连，失败也会自己重试
   connect() {
     try {
       console.log('[ws-client] 连接中:', this.url)
@@ -45,25 +47,29 @@ export class RobotWSClient {
     }
   }
 
+  // 往 ws 发 topic + payload，没连上就 silently 丢掉
   send(topic: string, payload: any) {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ topic, data: payload }))
     }
   }
 
+  // 主动断开，先置 disposed 再关，省得 onclose 又触发重连
   disconnect() {
-    this.disposed = true // 2026-08-28 先置位再关闭，拦截 onclose 引发的重连
+    this.disposed = true // 先置位再关闭，拦截 onclose 引发的重连
     clearTimeout(this.reconnectTimer)
     clearInterval(this.heartbeatTimer)
     this.ws?.close()
   }
 
+  // 15 秒一次心跳，服务器不响应就断了再重连
   private startHeartbeat() {
     this.heartbeatTimer = window.setInterval(() => {
       this.send('__ping__', { t: Date.now() })
     }, 15000)
   }
 
+  // 指数退避加重连，最多试 10 次，够了就放弃
   private scheduleReconnect() {
     if (this.reconnectAttempts >= this.maxReconnect) {
       console.warn('[ws-client] 达到最大重连次数, 放弃:', this.maxReconnect)

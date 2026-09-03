@@ -12,7 +12,7 @@ const ALERT_DEDUPE_WINDOW_MS = 30_000 // 30 秒
 // 未登录跳过提示只打一次
 let skippedAlertWarned = false
 
-// 写入告警 —— 带 30 秒去重
+// 写告警到 Supabase，带 30 秒去重，避免同一错误刷屏
 export async function writeAlert(alert: UnifiedAlert) {
   if (!isSupabaseEnabled) return
 
@@ -45,7 +45,7 @@ export async function writeAlert(alert: UnifiedAlert) {
   if (error) console.error('[writeAlert]', error)
 }
 
-// 列出告警（AlertsPage 初始化用），unresolvedOnly=true 只看未解决
+// 列告警，AlertsPage 初始化用，unresolvedOnly=true 只看未解决
 export async function listAlerts(unresolvedOnly = false) {
   if (!isSupabaseEnabled) return []
 
@@ -65,7 +65,7 @@ export async function listAlerts(unresolvedOnly = false) {
   return data ?? []
 }
 
-// 标记告警已解决
+// 把告警标成已解决
 export async function resolveAlert(alertId: string) {
   if (!isSupabaseEnabled) return
 

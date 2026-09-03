@@ -1,7 +1,5 @@
-/**
- * 品牌配置注册表
- * 统一管理所有机器人品牌的颜色、图标、协议、分类，用于 UI 一致性渲染
- */
+// 品牌配置注册表，颜色/图标/协议/分类集中放这里
+// 免得 Dashboard、RobotCards、RobotsPage 各写各的，后面改起来要命
 
 export interface BrandConfig {
   name: string          // 显示名
@@ -24,7 +22,9 @@ export const BRAND_REGISTRY: Record<string, BrandConfig> = {
   agibot:  { name: 'AGIBot',  color: '#14b8a6', badgeBg: '#ccfbf1', icon: '🤝', protocol: 'REST',        category: 'mobile_robot' },
 }
 
+// 拿品牌配置，大小写都能命中，找不到就给个灰色的默认配置
 export function getBrandConfig(brand: string): BrandConfig {
+  // 统一按小写匹配，UI 传入 FANUC/Keenon 等大小写都能命中
   return BRAND_REGISTRY[brand.toLowerCase()] || {
     name: brand.toUpperCase(),
     color: '#6b7280',

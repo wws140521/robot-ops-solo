@@ -7,11 +7,9 @@ interface GlowTrajectoryProps {
   color?: string
 }
 
-/**
- * GlowTrajectory - 发光轨迹线
- * 使用 AdditiveBlending 实现深科技感发光效果（加法混合）
- * 双层结构：外层虚线扩散 + 内层实线核心
- */
+// GlowTrajectory - 发光轨迹线
+// 用 AdditiveBlending 做深科技感发光效果
+// 双层：外层虚线光晕 + 内层实线核心
 export function GlowTrajectory({ points, color = '#4a9eff' }: GlowTrajectoryProps) {
   const pts = useMemo(
     () => points.map((p) => [p.x, 0.08, p.y] as [number, number, number]),

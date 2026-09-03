@@ -4,7 +4,7 @@
 
 import type { UnifiedRobotState } from '../types/unified'
 
-/** 机器人原始 GPS 报文（WGS-84，GPS/手机/大多数模块默认坐标系） */
+// 机器人原始 GPS 报文（WGS-84，GPS/手机/大多数模块默认坐标系）
 export interface GpsRawMsg {
   deviceId: string
   lat: number        // WGS-84 纬度
@@ -39,7 +39,7 @@ function transformLng(x: number, y: number): number {
   return ret
 }
 
-/** WGS-84 (lng, lat) → GCJ-02 纠偏 */
+// WGS-84 (lng, lat) → GCJ-02 纠偏
 export function wgs84ToGcj02(lng: number, lat: number): { lng: number; lat: number } {
   // 中国境外（如南海、海外坐标）不纠偏，直接返回
   if (lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271) {
@@ -58,7 +58,7 @@ export function wgs84ToGcj02(lng: number, lat: number): { lng: number; lat: numb
   return { lng: lng + newLng, lat: lat + newLat }
 }
 
-/** GPS 原始报文 → UnifiedRobotState（室外模式） */
+// GPS 原始报文 → UnifiedRobotState（室外模式）
 export function adaptGps(raw: GpsRawMsg): UnifiedRobotState {
   const coordsys = raw.coordsys ?? 'wgs84'
   const { lng, lat } = coordsys === 'wgs84'

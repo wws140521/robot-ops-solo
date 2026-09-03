@@ -18,7 +18,7 @@ interface WebhookConfig {
   enabled: boolean
 }
 
-// 查当前租户启用的、订阅了该告警级别的 webhook 配置
+// 查当前租户启用的 webhook 配置，看有没有订阅这个告警级别
 async function getActiveWebhooks(level: string): Promise<WebhookConfig[]> {
   if (!isSupabaseEnabled) return []
 
@@ -35,7 +35,8 @@ async function getActiveWebhooks(level: string): Promise<WebhookConfig[]> {
   return (data ?? []) as WebhookConfig[]
 }
 
-// 发送告警到企微/钉钉/飞书
+// 把告警推到企微/钉钉/飞书机器人
+// 各类机器人格式不一样，失败只记日志不影响主告警流程
 export async function pushWebhook(alert: AlertPayload) {
   const webhooks = await getActiveWebhooks(alert.level)
 

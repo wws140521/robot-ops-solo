@@ -1,22 +1,26 @@
-/**
- * 低空 / 机巢专用 Agent Tool
- */
+// 低空机巢和起降场专用的 agent tool
+// 遥测查询函数由外部注入，agent-kit 不直接依赖 store
 import type { UnifiedRobotState } from 'robot-adapter-kit'
 import type { Tool } from './types'
 
-/** 外部注入的遥测查询函数 */
+// 外部注入的遥测查询函数签名
 export type TelemetryQueryFn = (robotId: string) => Promise<UnifiedRobotState | null>
 
+// 默认返回空，运行时在 web-console 中注入真实的遥测查询
+// 这样 agent-kit 不直接依赖任何 store / HTTP 客户端
 let queryTelemetryImpl: TelemetryQueryFn = async () => null
 
+// 注入真实的遥测查询函数，web-console 启动时会设
 export function setTelemetryQuery(fn: TelemetryQueryFn): void {
   queryTelemetryImpl = fn
 }
 
+// 内部统一查询入口
 async function queryTelemetry(robotId: string): Promise<UnifiedRobotState | null> {
   return queryTelemetryImpl(robotId)
 }
 
+// 查询机巢状态
 export const queryDockState: Tool = {
   name: 'queryDockState',
   description: '查询指定无人机机巢/起降场的运行状态、充电状态、气象与告警',
@@ -47,6 +51,7 @@ export const queryDockState: Tool = {
   },
 }
 
+// 查询起降场状态
 export const queryVertiportState: Tool = {
   name: 'queryVertiportState',
   description: '查询 eVTOL 起降场地面设施状态（充电坪/消防/照明）',

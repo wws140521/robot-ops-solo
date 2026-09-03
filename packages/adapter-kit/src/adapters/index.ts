@@ -3,22 +3,18 @@ import { adaptIncoming, adaptIncomingAlert, adaptCommercial } from './commercial
 import { adaptIndustrial, getRegisteredIndustrialBrands, registry } from './industrial/_registry'
 import { adaptAerial, getRegisteredAerialBrands, aerialRegistry } from './aerial/_registry'
 
-// 工业品牌集合
+// 工业品牌目前就这几个，现场要加新的得先写 adapter
 const INDUSTRIAL_BRANDS = new Set([
   'fanuc', 'kuka', 'estun', 'yaskawa',
 ])
 
-// 低空品牌集合
+// 低空品牌集合，机巢和起降场都归这里
 const AERIAL_BRANDS = new Set([
   'dji-dock', 'autel-dock', 'generic-vertiport',
 ])
 
-/**
- * 增强版 adaptByBrand
- * - 工业品牌 → 走 industrial/_registry
- * - 低空品牌 → 走 aerial/_registry
- * - 商用品牌 → 走 commercial 逻辑
- */
+// adaptByBrand 的增强版，先认品牌再决定丢给谁处理
+// 工业 → industrial/_registry，低空 → aerial/_registry，剩下的按商用老逻辑
 export function adaptByBrandEnhanced(
   brand: string,
   raw: any
@@ -36,12 +32,12 @@ export function adaptByBrandEnhanced(
   return adaptCommercial(brand, raw)
 }
 
-// re-export 保持向后兼容
+// 老代码可能还在用这些名字，先保留，后面再慢慢迁
 export { adaptIncoming, adaptIncomingAlert, adaptCommercial }
 export { adaptIndustrial, getRegisteredIndustrialBrands, registry }
 export { adaptAerial, getRegisteredAerialBrands, aerialRegistry }
 
-// 品牌注册表 —— 4 商用 + 4 工业 + 3 低空
+// 品牌白名单，4 商用 + 4 工业 + 3 低空，数错了别怪我
 export const SUPPORTED_BRANDS = ['unitree', 'keenon', 'agibot', 'pudutech'] as const
 export type Brand = typeof SUPPORTED_BRANDS[number]
 export const INDUSTRIAL_BRAND_LIST = ['fanuc', 'kuka', 'estun', 'yaskawa'] as const

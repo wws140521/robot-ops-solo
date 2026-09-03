@@ -1,17 +1,15 @@
-/**
- * 宇树 G1 四足机器人 — 关节树版本
- * 每条腿构建两级关节链：hip（绕 X）→ knee（绕 X）
- *
- * 结构：
- *   机身
- *     ├── 前左腿：hip_l → knee_l
- *     ├── 前右腿：hip_r → knee_r
- *     ├── 后左腿：hip_l_back → knee_l_back
- *     └── 后右腿：hip_r_back → knee_r_back
- *
- * joints prop 格式：Record<string, number>（来自 WS 数据）
- *   hip_l, hip_r, knee_l, knee_r, hip_l_back, hip_r_back, knee_l_back, knee_r_back
- */
+// 宇树 G1 四足机器人 — 关节树版本
+// 每条腿两级关节链：hip（绕 X）→ knee（绕 X）
+//
+// 结构：
+//   机身
+//     ├── 前左腿：hip_l → knee_l
+//     ├── 前右腿：hip_r → knee_r
+//     ├── 后左腿：hip_l_back → knee_l_back
+//     └── 后右腿：hip_r_back → knee_r_back
+//
+// joints 来自 WS，格式 Record<string, number>
+// 支持的 key：hip_l/hip_r/knee_l/knee_r 以及 hip_fl/hip_fr 等新命名
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -35,7 +33,7 @@ const SHIN_LEN = 0.18      // 小腿长度
 const HIP_THICKNESS = 0.04
 const SHIN_THICKNESS = 0.035
 
-/** 单腿：hip 枢轴 → thigh mesh → knee 枢轴 → shin mesh → foot */
+// 单腿：hip 枢轴 → thigh mesh → knee 枢轴 → shin mesh → foot
 function Leg({
   hipAngle,
   kneeAngle,

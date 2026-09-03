@@ -19,14 +19,14 @@ export function RobotViewer({ state, showMap = true }: RobotViewerProps) {
   const palette = useScenePalette()
 
   // 用 ref 缓存最新 state，防止短暂 falsy 导致 RobotBody 卸载
-  // 当 WS 重连、碰撞检测、电量临界等情况 state 短暂变为 undefined/null 时，
-  // 使用上一个有效状态继续渲染，避免机器人闪烁为蓝色 wireframe
+  // WS 重连、碰撞检测、电量临界时 state 可能变成 undefined/null，
+  // 这时候用上一个有效状态继续渲染，不然机器人会闪成蓝色 wireframe，贼丑
   const lastValidStateRef = useRef<UnifiedRobotState | undefined>(state)
   if (state) lastValidStateRef.current = state
   const effectiveState = state ?? lastValidStateRef.current
 
-  // 当 state 从有值变为无值后又恢复时，确保我们不会卸载组件
-  // 使用 hasEverHadState 标记：一旦有过有效 state，就保持组件挂载
+  // 一旦有过有效 state 就保持组件挂载，
+  // 后面 state 再来回变也不会卸载，避免 three-urdf mesh 状态丢失
   const hasEverHadStateRef = useRef(false)
   if (effectiveState) hasEverHadStateRef.current = true
   const shouldRenderRobot = effectiveState || hasEverHadStateRef.current

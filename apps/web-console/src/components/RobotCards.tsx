@@ -1,8 +1,5 @@
-/**
- * 异构设备卡片墙
- * 同屏渲染地面机器人 / 无人机机巢 / eVTOL 起降场
- * 数据来源：useRobotStore（由 wsHub MQTT 接入实时刷新）
- */
+// 异构设备卡片墙，工业机械臂/地面机器人/无人机机巢/起降场都混一起显示
+// 数据来自 useRobotStore，WS/MQTT 推一次就刷新一次
 import { useState, useMemo } from 'react'
 import { useRobotStore } from '../stores/robotStore'
 import type { UnifiedRobotState, DeviceClass } from 'robot-adapter-kit'

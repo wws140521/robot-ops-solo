@@ -1,7 +1,5 @@
-/**
- * 商用机器人适配器聚合
- * 宇树/擎朗/普渡/智元 → UnifiedRobotState
- */
+// 商用机器人适配器聚合
+// 宇树/擎朗/普渡/智元 → UnifiedRobotState
 import type { UnifiedRobotState, UnifiedAlert } from '../../types/unified'
 import { adaptUnitree, adaptUnitreeAlert } from './adapter-unitree'
 import { adaptKeenon, adaptKeenonAlert } from './adapter-keenon'
@@ -86,9 +84,7 @@ export function adaptIncomingAlert(
   }
 }
 
-/**
- * 商用统一分发：返回 state + alerts
- */
+// 商用统一分发：返回 state + alerts
 export function adaptCommercial(
   brand: string,
   raw: any

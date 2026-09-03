@@ -1,4 +1,5 @@
-// robot-adapter-kit 公共入口
+// robot-adapter-kit 对外总出口，其实就一堆 re-export，省得业务方到处 import
+// 后面加新模块的话，顺手往这里补一行就行
 export type {
   UnifiedRobotState,
   UnifiedAlert,

@@ -1,13 +1,8 @@
 import { memo } from 'react'
 
-/**
- * StateMachine - 底部状态机步进指示器
- * 
- * 显示机器人当前状态在状态流中的位置: IDLE → MOVING → WORKING → CHARGING
- * 当前状态高亮 + 发光效果，其余状态半透明
- * 
- * 对应文档: G1-FULL-RESTORE.md §4.6
- */
+// StateMachine - 底部状态机步进指示器
+// 显示机器人当前状态在状态流里的位置：IDLE → MOVING → WORKING → CHARGING
+// 当前状态高亮 + 发光，其余半透明
 
 const STATES = ['idle', 'moving', 'working', 'charging'] as const
 export type RobotState = typeof STATES[number]

@@ -20,6 +20,7 @@ import { useRobotStore } from '../../stores/robotStore'
 import { useThemeStore } from '../../stores/themeStore'
 import { getOverallConnState, subscribeConnState } from '../../lib/wsHub'
 
+// 侧边栏导航项，to 是路由，end 控制 NavLink 是否严格匹配
 const navItems: { to: string; label: string; icon: LucideIcon; end: boolean }[] = [
   { to: '/',           label: '仪表盘',    icon: LayoutDashboard, end: true  },
   { to: '/robots',     label: '机器人',    icon: Bot,             end: false },
@@ -33,6 +34,7 @@ const navItems: { to: string; label: string; icon: LucideIcon; end: boolean }[] 
   { to: '/ota',        label: 'OTA 升级',  icon: DownloadCloud,   end: false },
 ]
 
+// 左侧边栏：logo + 导航 + WS 状态 + 主题切换
 export function Sidebar() {
   const { tenant } = useTenantStore()
   const onlineCount = useRobotStore((s) => s.onlineCount)
@@ -40,7 +42,7 @@ export function Sidebar() {
   const toggleTheme = useThemeStore((s) => s.toggle)
   const isLight = themeMode === 'light'
 
-  // P7: 细致连接状态（绿/黄/红）
+  // WS 连接状态：绿/黄/红，给底部那个小圆点用
   const [connState, setConnState] = useState(getOverallConnState())
   useEffect(() => {
     const unsub = subscribeConnState(() => setConnState(getOverallConnState()))

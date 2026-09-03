@@ -5,6 +5,7 @@ import { useAlertStore } from '../stores/alertStore'
 import { MessageSquare, X, Send } from 'lucide-react'
 import type { SopTemplate } from 'robot-agent-kit'
 
+// 演示用的内置 SOP 模板；生产环境应从后端 /sop 接口加载
 const DEMO_SOPS: SopTemplate[] = [
   {
     alarm_code: 'OVER_TEMP_J2',
@@ -29,6 +30,7 @@ const DEMO_SOPS: SopTemplate[] = [
   },
 ]
 
+// 右下角悬浮的运维助手聊天面板
 export function ChatPanel({ robotId }: { robotId?: string }) {
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
@@ -48,19 +50,25 @@ export function ChatPanel({ robotId }: { robotId?: string }) {
     setSopMatcher((code: string) => DEMO_SOPS.find((s) => s.alarm_code === code) || null)
   }, [])
 
+  // 新消息或展开面板时自动滚到底部
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages, open])
 
+  // 发送消息给 agent
   const send = async () => {
     if (!input.trim() || loading) return
     const userText = input.trim()
+
+    // 立即把用户消息显示出来，避免等待时界面空白
     setInput('')
     setMessages((m) => [...m, { role: 'user', text: userText }])
     setLoading(true)
+
     try {
+      // 演示阶段强制走 mock 逻辑，后续可取消 forceMock 接入真实 LLM
       const reply = await runAgent(userText, { robotIdHint: robotId, forceMock: true })
       setMessages((m) => [...m, { role: 'agent', text: reply }])
     } catch (e) {

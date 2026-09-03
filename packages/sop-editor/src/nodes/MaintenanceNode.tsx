@@ -1,3 +1,4 @@
+// 维护工单节点，显示优先级、通知通道和负责人
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Wrench } from 'lucide-react'
 import { NodeEditButton } from './NodeEditButton'
@@ -18,6 +19,7 @@ export interface MaintenanceNodeData {
   label?: string
 }
 
+// 维护节点渲染
 export function MaintenanceNode({ id, data, selected }: NodeProps) {
   const d = data as unknown as MaintenanceNodeData
   const priority = d.priority || 'medium'

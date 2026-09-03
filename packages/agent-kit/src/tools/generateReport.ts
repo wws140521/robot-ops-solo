@@ -1,6 +1,7 @@
 import type { Tool } from './types'
 import { getRobotState, getAlerts } from './state-source'
 
+// 生成机器人健康/维修/保养报告的 Markdown 草稿，给人工确认用
 export const generateReport: Tool = {
   name: 'generateReport',
   description: '生成《机器人健康/维修报告》Markdown 草稿（供人工确认后发出）',
@@ -17,15 +18,19 @@ export const generateReport: Tool = {
     const state = getRobotState(robot_id)
     if (!state) return { error: `未找到机器人 ${robot_id}` }
 
+    // 根据用户关键词确定报告标题
     const titleMap: Record<string, string> = {
       health: '健康报告',
       repair: '维修报告',
       maintenance: '保养报告',
     }
     const title = titleMap[type] ?? '运维报告'
+
+    // 同时考虑离线告警库和实时流告警，只统计未清除 / error / warn 级别
     const activeAlarms = (state.industrial?.alarms ?? []).filter((a) => !a.cleared)
     const streamAlerts = getAlerts(robot_id).filter((a) => a.level === 'error' || a.level === 'warn')
 
+    // 计算整体健康分并找出最差关节，用于报告重点提示
     const joints = state.industrial?.joints ?? []
     const avgHealth = joints.length
       ? joints.reduce((sum, j) => sum + (j.health_score ?? 100), 0) / joints.length
@@ -34,6 +39,7 @@ export const generateReport: Tool = {
       (a, b) => (a.health_score ?? 100) - (b.health_score ?? 100)
     )[0]
 
+    // 拼接 Markdown，空字符串会在 filter(Boolean) 时被剔除
     const md = [
       `# ${title} · ${robot_id}`,
       `> 生成时间：${new Date().toISOString()}`,

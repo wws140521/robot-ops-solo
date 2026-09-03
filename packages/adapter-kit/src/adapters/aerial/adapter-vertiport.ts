@@ -1,7 +1,5 @@
-/**
- * eVTOL 起降场适配器
- * 输入：起降场地面设施 BACnet / Modbus / 厂商 API 数据
- */
+// eVTOL 起降场适配器，地面设施 BACnet/Modbus/厂商 API 的数据都能吃
+// 其实就是把各种字段塞到统一的 vertiport 结构里
 import type { UnifiedRobotState, UnifiedAlert, UAV_ALARM_CODES } from '../../types/unified'
 
 type AlarmCode = typeof UAV_ALARM_CODES[keyof typeof UAV_ALARM_CODES]
@@ -28,6 +26,7 @@ export function adaptVertiport(raw: any): { state: UnifiedRobotState; alerts: Un
     robotId,
     brand: 'generic-vertiport',
     model: raw.model ?? 'Vertiport Ground System',
+    // 起降场本身没有电池概念，这里复用 voltage 字段表示地面电源电压
     batteryPct: 0,
     voltage: raw.groundPowerV ?? raw.ground_power_v ?? 0,
     online: true,

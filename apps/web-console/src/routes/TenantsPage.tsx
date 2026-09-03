@@ -4,19 +4,21 @@ import { useThemeStore } from '../stores/themeStore'
 import { listTenants, createTenant, type TenantRecord } from '../lib/tenantStorage'
 import { Sun, Moon, Plus, X } from 'lucide-react'
 
+// 套餐对应中文标签
 const PLAN_LABELS: Record<string, string> = {
   free: '免费版',
   pro: '专业版',
   enterprise: '企业版',
 }
 
+// 套餐对应颜色
 const PLAN_COLORS: Record<string, string> = {
   free: 'var(--text-tertiary)',
   pro: 'var(--primary)',
   enterprise: 'var(--accent)',
 }
 
-// TenantRecord → 前端 Tenant 适配
+// 后端 TenantRecord 转前端 Tenant 对象
 function recordToTenant(r: TenantRecord): Tenant {
   return {
     id: r.slug,
@@ -26,6 +28,7 @@ function recordToTenant(r: TenantRecord): Tenant {
   }
 }
 
+// 租户管理页：列表、切换、新建
 export function TenantsPage() {
   const { tenant: currentTenant, setTenant } = useTenantStore()
   const [tenants, setTenants] = useState<TenantRecord[]>([])
@@ -34,6 +37,7 @@ export function TenantsPage() {
   const toggleTheme = useThemeStore((s) => s.toggle)
   const isLight = themeMode === 'light'
 
+  // 加载租户列表，加个 cancelled 标记防卸载后还 setState
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -46,6 +50,7 @@ export function TenantsPage() {
     return () => { cancelled = true }
   }, [])
 
+  // 切换租户，改 URL 参数并应用品牌色
   const handleSwitch = (t: Tenant) => {
     setTenant(t)
     document.documentElement.setAttribute('data-tenant', t.id)
@@ -57,6 +62,7 @@ export function TenantsPage() {
   const [formColor, setFormColor] = useState('#00f0ff')
   const [formPlan, setFormPlan] = useState('pro')
 
+  // 新建租户，名称转小写 slug，然后刷新列表
   const handleCreate = async () => {
     if (!formName.trim()) return
     const slug = formName.trim().toLowerCase().replace(/[^a-z0-9]/g, '-')

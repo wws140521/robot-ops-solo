@@ -1,7 +1,5 @@
-/**
- * 健康分仪表盘（SVG 圆环）
- * 颜色：≥80 绿、≥60 黄、≥40 橙、<40 红
- */
+// 健康分仪表盘，SVG 圆环
+// 颜色分段：80以上绿，60以上黄，40以上橙，40以下红
 
 interface Props {
   score: number
@@ -9,6 +7,7 @@ interface Props {
   label?: string
 }
 
+// 根据分数给圆环选颜色
 function healthColor(score: number): string {
   if (score >= 80) return 'var(--status-online)'
   if (score >= 60) return 'var(--status-working)'
@@ -16,6 +15,7 @@ function healthColor(score: number): string {
   return 'var(--status-error)'
 }
 
+// SVG 圆环仪表盘，score 限制在 0-100 避免画出去
 export function HealthGauge({ score, size = 120, label = '健康分' }: Props) {
   const radius = (size - 20) / 2
   const circumference = 2 * Math.PI * radius

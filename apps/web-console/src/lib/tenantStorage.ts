@@ -1,5 +1,4 @@
-// 租户存储层 —— Supabase 持久化 + localStorage 离线降级
-// 对应 SUPABASE.md 第五节 5.1
+// 租户存储层：Supabase 持久化 + localStorage 离线降级
 import { supabase, isSupabaseEnabled } from './supabase'
 
 export interface TenantRecord {
@@ -14,7 +13,7 @@ export interface TenantRecord {
   updated_at: string
 }
 
-// 离线 mock 数据（与 mock-ws-server 保持一致）
+// 离线 mock 数据，和 mock-ws-server 保持一致
 const MOCK_TENANTS: TenantRecord[] = [
   {
     slug: 'laowang',
@@ -53,6 +52,7 @@ const MOCK_TENANTS: TenantRecord[] = [
 
 const LS_KEY = 'mock_tenants'
 
+// 从 localStorage 读 mock 租户
 function readMock(): TenantRecord[] {
   try {
     const stored = localStorage.getItem(LS_KEY)
@@ -61,13 +61,14 @@ function readMock(): TenantRecord[] {
   return MOCK_TENANTS
 }
 
+// 把 mock 租户写回 localStorage
 function writeMock(tenants: TenantRecord[]) {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(tenants))
   } catch {}
 }
 
-// 列出所有租户（Supabase 启用时走数据库，否则走 localStorage mock）
+// 列出所有租户，Supabase 启用走数据库，否则走 localStorage mock
 export async function listTenants(): Promise<TenantRecord[]> {
   if (!isSupabaseEnabled) return readMock()
 
@@ -83,7 +84,7 @@ export async function listTenants(): Promise<TenantRecord[]> {
   return data as TenantRecord[]
 }
 
-// 更新租户信息（贴牌配置：logo、品牌色等）
+// 更新租户信息，主要是贴牌配置：logo、品牌色这些
 export async function updateTenant(
   slug: string,
   patch: Partial<Omit<TenantRecord, 'slug' | 'created_at'>>
@@ -111,7 +112,7 @@ export async function updateTenant(
   return data as TenantRecord
 }
 
-// 新建租户
+// 新建租户，mock 模式直接插到 localStorage 最前面
 export async function createTenant(
   tenant: Omit<TenantRecord, 'created_at' | 'updated_at'>
 ): Promise<TenantRecord | null> {

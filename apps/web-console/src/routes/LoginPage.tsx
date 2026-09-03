@@ -3,6 +3,7 @@ import { supabase, isSupabaseEnabled } from '../lib/supabase'
 
 const LS_KEY = 'robotops_login'
 
+// 读取本地记住的账号密码，读失败就返回空
 function loadSavedLogin(): { email: string; password: string; remember: boolean } {
   try {
     const raw = localStorage.getItem(LS_KEY)
@@ -11,6 +12,7 @@ function loadSavedLogin(): { email: string; password: string; remember: boolean 
   return { email: '', password: '', remember: false }
 }
 
+// 登录页，支持密码登录和魔法链接
 export function Login() {
   const saved = loadSavedLogin()
   const [email, setEmail] = useState(saved.email)
@@ -45,6 +47,7 @@ export function Login() {
     )
   }
 
+  // 密码登录，成功后根据 remember 决定是否存本地
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
@@ -53,7 +56,7 @@ export function Login() {
     if (error) {
       setError(error.message)
     } else {
-      // 登录成功：根据勾选状态保存或清除本地账号
+      // 勾了记住我就存一下，否则清掉
       if (remember) {
         localStorage.setItem(LS_KEY, JSON.stringify({ email, password, remember }))
       } else {
@@ -64,6 +67,7 @@ export function Login() {
     setLoading(false)
   }
 
+  // 魔法链接登录，免密码
   async function handleMagicLink(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)

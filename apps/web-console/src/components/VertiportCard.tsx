@@ -1,18 +1,18 @@
-/**
- * eVTOL 起降场地面设施卡片
- */
+// eVTOL 起降场地面设施卡片
 import type { UnifiedRobotState } from 'robot-adapter-kit'
 
 interface VertiportCardProps {
   device: UnifiedRobotState
 }
 
+// 健康分颜色，跟 DockCard 一个套路
 function healthColor(score: number): string {
   if (score >= 80) return 'var(--status-online)'
   if (score >= 60) return 'var(--alert-warn)'
   return 'var(--status-error)'
 }
 
+// 起降场卡片，展示充电坪、消防、照明这些地面设施状态
 export function VertiportCard({ device }: VertiportCardProps) {
   const { vertiport } = device
   const score = device.batteryPct ?? 85

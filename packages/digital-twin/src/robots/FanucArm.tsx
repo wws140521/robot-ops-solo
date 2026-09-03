@@ -1,18 +1,7 @@
-/**
- * FANUC 6 轴工业机器人 — 关节树版本
- * 正确的关节层级结构：
- *   Base
- *     └── J1 (绕 Y 旋转：底座旋转)
- *           └── J2 (绕 X 旋转：大臂摆动)
- *                 └── J3 (绕 X 旋转：小臂摆动)
- *                       └── J4 (绕 X 旋转：腕部)
- *                             └── J5 (绕 Y 旋转：腕部旋转)
- *                                   └── J6 (绕 X 旋转：腕部最终)
- *                                         └── 末端执行器
- *
- * 每个关节是一个 group（枢轴在关节原点），连杆 mesh 在 group 内沿 -Y 偏移 halfLength
- * useFrame 中 lerp 驱动 group 旋转角度 → 关节正确绕自身枢轴旋转
- */
+// FANUC 6 轴工业机器人 — 关节树版本
+// 关节层级：Base → J1(Y) → J2(X) → J3(X) → J4(X) → J5(Y) → J6(X) → 末端执行器
+// 每个关节是一个 group（枢轴在关节原点），连杆 mesh 在 group 内沿 -Y 偏移 halfLength
+// useFrame 里用 lerp 驱动 group 旋转，这样关节才会绕自己的枢轴转
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -27,7 +16,7 @@ const FANUC_ORANGE = '#FF6600'
 const FANUC_DARK = '#1a1a1a'
 const FANUC_METAL = '#2b3a5a'
 
-/** 连杆参数（单位米，按 M-20iD/25 近似比例） */
+// 连杆参数（单位米，按 M-20iD/25 近似比例瞎估的）
 const LINK = {
   baseH: 0.25,
   j1H: 0.15,
@@ -44,7 +33,7 @@ function getJointColor(loadPct: number, base = FANUC_ORANGE): string {
   return base
 }
 
-/** 单关节枢轴 + 连杆组合件 */
+// 单关节枢轴 + 连杆组合件
 function JointWithLink({
   position,
   axis,

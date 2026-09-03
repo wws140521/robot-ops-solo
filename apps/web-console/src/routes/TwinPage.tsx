@@ -6,8 +6,10 @@ import { Canvas } from '@react-three/fiber'
 import { useState } from 'react'
 import { Radio, Music4 } from 'lucide-react'
 
+// 工业机械臂品牌集合，这几个牌子用机械臂模型，不是人形
 const INDUSTRIAL_BRANDS = new Set(['FANUC', 'KUKA', 'ESTUN', 'YASKAWA'])
 
+// 数字孪生页：3D 机器人 / 机械臂 + HUD + 告警滚动
 export function TwinPage() {
   const { id } = useParams()
   const { robots } = useRobotStore()
@@ -17,6 +19,7 @@ export function TwinPage() {
   const [radarOn, setRadarOn] = useState(true)
   const [dancing, setDancing] = useState(false)
 
+  // 当前选中机器人最近 6 条告警，底部滚动用
   const recentAlerts = alerts.filter((a) => a.robotId === selected?.robotId).slice(0, 6)
 
   return (

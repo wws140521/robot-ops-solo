@@ -1,5 +1,4 @@
-// 注册页 —— 创建账号 + 绑定 tenant_slug + 建租户记录
-// 对应 SUPABASE.md 第八节 8.2
+// 注册页：创建账号 + 绑定 tenant_slug + 建租户记录
 import { useState } from 'react'
 import { supabase, isSupabaseEnabled } from '../lib/supabase'
 
@@ -11,7 +10,7 @@ export function SignUp() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
-  // 离线模式提示
+  // Supabase 没配就显示离线提示
   if (!isSupabaseEnabled) {
     return (
       <div
@@ -64,7 +63,7 @@ export function SignUp() {
     setLoading(true)
     setMessage('')
 
-    // 1. 创建 auth 用户，tenant_slug 写入 user_metadata（RLS 据此隔离）
+    // 1. 创建 auth 用户，把 tenant_slug 写进 user_metadata，RLS 靠这个隔离数据
     const { error } = await supabase!.auth.signUp({
       email,
       password,

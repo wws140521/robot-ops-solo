@@ -22,14 +22,12 @@ export interface StoredSop {
   created_at: string
 }
 
-// ============================================================
-// 保存（新建或更新，version 自增）
-// ============================================================
+// 保存 SOP 模板，新建或更新都会让 version 自增
 export async function saveSop(
   graph: SopGraph,
   options?: { description?: string; is_published?: boolean }
 ): Promise<StoredSop> {
-  // 离线降级：localStorage
+  // Supabase 没配就走 localStorage 降级
   if (!isSupabaseEnabled) {
     return saveSopLocal(graph, options)
   }
@@ -67,9 +65,7 @@ export async function saveSop(
   return data as StoredSop
 }
 
-// ============================================================
-// 读取单个
-// ============================================================
+// 读取单个 SOP 模板
 export async function loadSop(id: string): Promise<StoredSop | null> {
   if (!isSupabaseEnabled) {
     return loadSopLocal(id)
@@ -85,9 +81,7 @@ export async function loadSop(id: string): Promise<StoredSop | null> {
   return data as StoredSop | null
 }
 
-// ============================================================
-// 列出当前租户所有模板
-// ============================================================
+// 列出当前租户所有 SOP 模板，支持按行业/品牌/发布状态过滤
 export async function listSops(filters?: {
   industry?: string
   brand?: string
@@ -112,9 +106,7 @@ export async function listSops(filters?: {
   return (data ?? []) as StoredSop[]
 }
 
-// ============================================================
-// 删除
-// ============================================================
+// 删除 SOP 模板
 export async function deleteSop(id: string): Promise<void> {
   if (!isSupabaseEnabled) {
     return deleteSopLocal(id)
@@ -125,9 +117,7 @@ export async function deleteSop(id: string): Promise<void> {
   if (error) throw error
 }
 
-// ============================================================
-// 发布/取消发布
-// ============================================================
+// 发布或取消发布 SOP 模板
 export async function publishSop(id: string, published: boolean): Promise<void> {
   if (!isSupabaseEnabled) return
 
@@ -139,9 +129,7 @@ export async function publishSop(id: string, published: boolean): Promise<void> 
   if (error) throw error
 }
 
-// ============================================================
-// 克隆模板（基于别人的发布模板建自己的副本）
-// ============================================================
+// 克隆别人的发布模板，生成自己的副本
 export async function cloneSop(id: string, newName?: string): Promise<StoredSop> {
   const original = await loadSop(id)
   if (!original) throw new Error('模板不存在')
@@ -172,9 +160,7 @@ export async function cloneSop(id: string, newName?: string): Promise<StoredSop>
   return data as StoredSop
 }
 
-// ============================================================
-// 导出为 JSON 文件（前端下载）
-// ============================================================
+// 把 SOP 图导出成 JSON 文件，触发浏览器下载
 export function exportSopFile(graph: SopGraph) {
   const blob = new Blob([JSON.stringify(graph, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
@@ -185,9 +171,7 @@ export function exportSopFile(graph: SopGraph) {
   URL.revokeObjectURL(url)
 }
 
-// ============================================================
-// 从 JSON 文件导入
-// ============================================================
+// 从用户选择的 JSON 文件导入 SOP 图
 export function importSopFile(file: File): Promise<SopGraph> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -203,11 +187,10 @@ export function importSopFile(file: File): Promise<SopGraph> {
   })
 }
 
-// ============================================================
 // ===== 离线降级：localStorage =====
-// ============================================================
 const LOCAL_PREFIX = 'sop:template:'
 
+// localStorage 版保存，Supabase 没配时兜底用
 function saveSopLocal(
   graph: SopGraph,
   options?: { description?: string; is_published?: boolean }
@@ -232,11 +215,13 @@ function saveSopLocal(
   return stored
 }
 
+// localStorage 版读取
 function loadSopLocal(id: string): StoredSop | null {
   const raw = localStorage.getItem(LOCAL_PREFIX + id)
   return raw ? (JSON.parse(raw) as StoredSop) : null
 }
 
+// localStorage 版列表，按更新时间倒序
 function listSopsLocal(filters?: {
   industry?: string
   brand?: string
@@ -257,6 +242,7 @@ function listSopsLocal(filters?: {
   return items.sort((a, b) => b.updated_at.localeCompare(a.updated_at))
 }
 
+// localStorage 版删除
 function deleteSopLocal(id: string) {
   localStorage.removeItem(LOCAL_PREFIX + id)
 }

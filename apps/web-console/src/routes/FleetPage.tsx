@@ -1,7 +1,4 @@
-/**
- * 异构设备总览页
- * 同屏展示地面机器人 / 无人机机巢 / eVTOL 起降场 / 边缘网关
- */
+// 异构设备总览页，同屏展示地面机器人 / 无人机机巢 / eVTOL 起降场 / 边缘网关
 import { RobotCards } from '../components/RobotCards'
 
 export function FleetPage() {

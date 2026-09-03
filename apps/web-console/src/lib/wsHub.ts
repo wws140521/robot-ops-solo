@@ -9,8 +9,8 @@ import { writeAlert } from './alertStorage'
 const INDUSTRIAL_BRANDS = new Set(['fanuc', 'kuka', 'estun', 'yaskawa'])
 // 2026-08-28 商用适配完成日志节流签名（robotId → 电量整数位:状态）
 const lastAdaptedSig: Record<string, string> = {}
-// 2026-08-18 wsHub 初始化，工业消息分流入口
-// 2026-08-21 接入 OTA 状态回调，将 MQTT ota/+/status 消息路由到 otaStore
+// wsHub 初始化入口
+// 这里先连 MQTT，把工业消息、OTA 状态回调都挂上去
 connectMqtt(
   (state, alerts) => {
     const { updateRobot } = useRobotStore.getState();
@@ -28,7 +28,8 @@ connectMqtt(
     )
   }
 );
-// 处理工业遥测消息（industrial_state / industrial_alert）
+
+// 处理工业遥测消息，industrial_state 写状态，industrial_alert 只写告警
 function handleIndustrialMessage(msg: any) {
   try {
     console.log('[wsHub] handleIndustrialMessage:', { type: msg.type, brand: msg.brand, payloadKeys: Object.keys(msg.payload ?? {}) })
@@ -62,28 +63,32 @@ interface WsConnection {
   robotId: string
 }
 
-// 按 robotId 索引，便于 SOP / 仪表盘反向控制定位连接
+// 按 robotId 索引 WS 客户端，SOP / 仪表盘下发指令时要用
 const clients: Map<string, RobotWSClient> = new Map()
 
-// 连接状态：'connected' | 'reconnecting' | 'disconnected'
+// WS 连接状态：已连 / 重连中 / 断开
 type ConnState = 'connected' | 'reconnecting' | 'disconnected'
 const connStates: Map<string, ConnState> = new Map()
 const connListeners: Set<() => void> = new Set()
 
+// 返回所有连接状态，给调试或状态页用
 export function getConnStates(): Record<string, ConnState> {
   return Object.fromEntries(connStates)
 }
 
+// 订阅整体连接状态变化，Sidebar 底部小圆点靠这个更新
 export function subscribeConnState(fn: () => void): () => void {
   connListeners.add(fn)
   return () => connListeners.delete(fn)
 }
 
+// 更新单条连接状态并通知订阅者
 function setConnState(robotId: string, state: ConnState) {
   connStates.set(robotId, state)
   connListeners.forEach((fn) => fn())
 }
 
+// 综合所有连接的状态：有重连就显示重连，全连才显示已连
 export function getOverallConnState(): ConnState {
   const states = Array.from(connStates.values())
   if (states.length === 0) return 'disconnected'
@@ -92,20 +97,20 @@ export function getOverallConnState(): ConnState {
   return 'disconnected'
 }
 
-// 是否为播报主题帧（/speak）
+// 判断是不是播报主题帧 /speak
 function isSpeakMessage(raw: any): boolean {
   return raw?.topic === '/speak'
 }
 
-// 2026-08-19 状态帧/告警帧分流，修复告警帧污染电量的问题
+// 状态帧和告警帧分流，避免告警帧把电量状态覆盖掉
 function isAlertMessage(brand: string, raw: any): boolean {
   if (brand === 'unitree') return raw?.topic === '/alert'
   if (brand === 'keenon') return raw?.cmd === 'alert'
   return false
 }
 
-// 处理 /speak：瞬时播报事件，只驱动 SpeakBubble + TTS + speakStore.history
-// 不再进入告警流（alertStore 专门留给需要跟进/ack 的工业告警）
+// 处理 /speak：瞬时播报事件，驱动气泡、TTS、历史记录
+// 这种不进 alertStore，alertStore 留给需要跟进的工业告警
 function handleSpeak(raw: any, robotId: string) {
   const speakEvent: SpeakEvent = {
     robotId,
@@ -132,7 +137,7 @@ function handleSpeak(raw: any, robotId: string) {
   console.log('[wsHub] 播报触发:', speakEvent.text)
 }
 
-// 启动一组 WS 连接（每条连接对应一台机器人）
+// 启动一组 WS 连接，每条连接对应一台机器人
 export function startWS(connections: WsConnection[]) {
   connections.forEach(({ brand, url, robotId }) => {
     const client = new RobotWSClient(
@@ -197,14 +202,14 @@ export function startWS(connections: WsConnection[]) {
   })
 }
 
+// 停止所有 WS 连接
 export function stopAllWS() {
   clients.forEach((c) => c.disconnect())
   clients.clear()
 }
 
-// SOP / 仪表盘 → 机器人反向控制：下发指令到指定 robotId
-// 例：sendCommand('peanut-001', '/speak', { text: '欢迎光临', volume: 0.8 })
-//     sendCommand('g1-001', '/move', { target: 'B', speed: 0.7 })
+// SOP / 仪表盘 下发指令到指定机器人
+// 比如 sendCommand('peanut-001', '/speak', { text: '欢迎光临' })
 export function sendCommand(robotId: string, topic: string, payload: any): boolean {
   const client = clients.get(robotId)
   if (!client) {

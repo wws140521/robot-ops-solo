@@ -1,3 +1,4 @@
+// SOP 可视化编辑器组件，基于 @xyflow/react
 import {
   ReactFlow,
   Background,
@@ -64,7 +65,7 @@ const NODE_COLORS: Record<string, string> = {
   log: '#9aa3b2',
 }
 
-// 自定义渐变连线：从源节点色渐变到目标节点色
+// 自定义渐变连线，颜色从源节点主题色渐变到目标节点主题色
 function GradientEdge({
   id,
   source,
@@ -139,6 +140,7 @@ const edgeTypes = {
   gradient: GradientEdge,
 }
 
+// SOP 编辑器主组件
 export function SopEditor() {
   const { nodes: storeNodes, edges: storeEdges, addNode, setNodes, setEdges, updateNode, editNodeId, clearEdit } = useSopStore()
 

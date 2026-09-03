@@ -16,11 +16,9 @@ const ROBOTS_UPSERT_INTERVAL_MS = 30_000 // 30 秒
 // 未登录跳过提示只打一次
 let skippedWriteWarned = false
 
-/**
- * 写入实时状态 —— 带 5 秒节流
- * 数据已大幅瘦身：移除 raw_msg（原始 WS 消息，调试用，体积大）
- *                移除 joints（关节数据，实时 3D 渲染用，历史轨迹不需要）
- */
+// 写入实时状态到 Supabase，带 5 秒节流
+// 之前每条 WS 消息都 INSERT，1 小时能写 700MB，现在 5 秒一次大幅瘦身
+// 注意：joints 和 raw_msg 不往历史表写，省空间
 export async function writeRobotState(state: UnifiedRobotState, _rawMsg?: unknown) {
   if (!isSupabaseEnabled) return
 
@@ -84,7 +82,7 @@ export async function writeRobotState(state: UnifiedRobotState, _rawMsg?: unknow
   }
 }
 
-// 读取历史轨迹（用于 3D 大屏回放）
+// 读取历史轨迹，给 3D 大屏回放用
 export async function getRobotTrajectory(
   robotId: string,
   fromTime: number,
@@ -107,7 +105,7 @@ export async function getRobotTrajectory(
   return data ?? []
 }
 
-// 列出当前租户所有机器人（初始化 robotStore 时用）
+// 列出当前租户所有机器人，初始化 robotStore 时调用
 export async function listRobots() {
   if (!isSupabaseEnabled) return []
 

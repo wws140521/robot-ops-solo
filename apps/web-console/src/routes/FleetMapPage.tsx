@@ -1,9 +1,8 @@
-// 2026-08-29 室外总览页
-// 高德真实路线 + 3D 机器人 + 实时 GPS 轨迹
+// 室外总览页：高德真实路线 + 3D 机器人 + 实时 GPS 轨迹
 import { MapRobotViewer } from '../components/map/MapRobotViewer'
 
-// 朝阳大悦城周边真实道路折线（GCJ-02 经纬度）
-// 可替换为高德 Walking API 规划的真实人行道路径
+// 朝阳大悦城周边真实道路折线，GCJ-02 坐标
+// 后面可以替换成高德 Walking API 规划的真实人行道路径
 const OUTDOOR_ROUTE = [
   { lng: 116.519942, lat: 39.924677 }, // 起点
   { lng: 116.520200, lat: 39.924900 },

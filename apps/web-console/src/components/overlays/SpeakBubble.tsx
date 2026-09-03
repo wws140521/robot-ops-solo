@@ -2,6 +2,7 @@ import { useSpeakStore } from '../../stores/speakStore'
 import { useEffect, useState } from 'react'
 import './SpeakBubble.css'
 
+// 全局播报气泡：WS 收到 /speak 后弹出，4 秒后自动消失
 export function SpeakBubble() {
   const lastSpeak = useSpeakStore((s) => s.lastSpeak)
   const history = useSpeakStore((s) => s.history)
@@ -10,6 +11,7 @@ export function SpeakBubble() {
   const [bubbleKey, setBubbleKey] = useState(0)
   const [showHistory, setShowHistory] = useState(false)
 
+  // 来了新播报就显示，4 秒后自动关掉
   useEffect(() => {
     if (lastSpeak) {
       setText(lastSpeak.text)
@@ -20,6 +22,7 @@ export function SpeakBubble() {
     }
   }, [lastSpeak])
 
+  // 把时间戳格式化成 HH:MM:SS
   const formatTime = (ts: number) => {
     const d = new Date(ts)
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`

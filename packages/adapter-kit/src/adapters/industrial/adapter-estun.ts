@@ -1,6 +1,4 @@
-/**
- * 埃斯顿 Modbus-TCP → UnifiedRobotState 适配器
- */
+// 埃斯顿 Modbus-TCP → UnifiedRobotState 适配器
 import type { UnifiedRobotState, UnifiedAlert } from '../../types/unified';
 import type {
   JointTelemetry,
@@ -17,6 +15,7 @@ const ESTUN_ALARM_MAP: Record<string, { udm_code: string; severity: AlarmSeverit
   'EST-3004': { udm_code: 'COMM_ERR', severity: 'error', zh_desc: '通信异常' },
 };
 
+// 埃斯顿 Modbus-TCP 原始报文 → UDM，告警码按 ESTUN_ALARM_MAP 翻译
 export function adaptEstun(
   raw: any
 ): { state: UnifiedRobotState; alerts: UnifiedAlert[] } {

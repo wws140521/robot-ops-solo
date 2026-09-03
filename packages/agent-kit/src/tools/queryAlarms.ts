@@ -1,6 +1,7 @@
 import type { Tool } from './types'
 import { getRobotState, getAlerts } from './state-source'
 
+// 查询机器人告警，把离线告警和实时流告警合并后按 code 聚类
 export const queryAlarms: Tool = {
   name: 'queryAlarms',
   description: '查询机器人告警列表，可按严重等级过滤；返回时按 udm_code 聚类去重',
@@ -18,7 +19,8 @@ export const queryAlarms: Tool = {
     const industrialAlarms = state?.industrial?.alarms ?? []
     const streamAlerts = getAlerts(robot_id)
 
-    // 合并工业告警与实时流告警，去重（按 code + timestamp）
+    // 工业告警来自 UDM 离线数据，流告警来自 WebSocket 实时推送
+    // 这里直接合并，聚类时再按 code 汇总；timestamp 仅用于排序和展示
     const all = [
       ...industrialAlarms.map((a) => ({
         level: a.severity,
@@ -39,6 +41,7 @@ export const queryAlarms: Tool = {
     const filtered = severity ? all.filter((a) => a.level === severity) : all
     const active = filtered.filter((a) => !a.cleared)
 
+    // 同一告警码可能多次触发，按 code 聚类后返回次数 + 最新一条样本
     const groups = new Map<string, typeof active>()
     active.forEach((a) => {
       if (!groups.has(a.code)) groups.set(a.code, [])

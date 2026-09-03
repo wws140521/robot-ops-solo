@@ -1,8 +1,5 @@
-/**
- * DJI Dock 2/3 适配器
- * 输入：大疆机场开放 API 返回的 JSON（经边缘侧 fetch 或 webhook）
- * 输出：UDM UnifiedRobotState + 告警
- */
+// DJI Dock 2/3 适配器，把大疆机场 API 的 JSON 转成 UDM
+// 大疆 API 有的字段驼峰有的下划线，这里两种都认，反正能拿到值就行
 import type { UnifiedRobotState, UnifiedAlert, UAV_ALARM_CODES } from '../../types/unified'
 
 type AlarmCode = typeof UAV_ALARM_CODES[keyof typeof UAV_ALARM_CODES]
@@ -19,10 +16,12 @@ export function adaptDJIDock(raw: any): { state: UnifiedRobotState; alerts: Unif
 
   const alarms: UnifiedAlert[] = []
 
+  // 统一封装告警，避免重复写 timestamp / robotId
   const pushAlarm = (code: AlarmCode, level: 'info' | 'warn' | 'error', message: string) => {
     alarms.push({ robotId, level, code, message, timestamp: Date.now() })
   }
 
+  // 机巢侧告警：温度、舱门、升降台
   if ((dock.chargerTemperatureC ?? dock.charger_temperature_c ?? 0) > 60) {
     pushAlarm('UAV_DOCK_CHARGER_OVER_TEMP', 'error', '机巢充电器过温')
   }
@@ -32,6 +31,8 @@ export function adaptDJIDock(raw: any): { state: UnifiedRobotState; alerts: Unif
   if ((dock.liftFault ?? dock.lift_fault) === true) {
     pushAlarm('UAV_DOCK_LIFT_FAULT', 'error', '升降平台故障')
   }
+
+  // 无人机侧告警：电量、电机温度、图传信号
   if ((uav?.batteryPercent ?? uav?.battery_percent ?? 100) < 15) {
     pushAlarm('UAV_BATTERY_LOW', 'warn', '无人机电量低')
   }
@@ -44,6 +45,7 @@ export function adaptDJIDock(raw: any): { state: UnifiedRobotState; alerts: Unif
 
   const dockState = (dock.dockState ?? dock.dock_state ?? 'idle') as DockState
 
+  // 状态映射：有 error 级告警时整体标 error；维护/充电状态保留原语义
   const state: UnifiedRobotState = {
     robotId,
     brand: 'dji-dock',
@@ -58,6 +60,7 @@ export function adaptDJIDock(raw: any): { state: UnifiedRobotState; alerts: Unif
       : 'idle',
     lastSeen: Date.now(),
     deviceClass: 'uav_dock',
+    // 机巢遥测：同时兼容驼峰和下划线字段，缺失时给安全默认值
     dock: {
       dockState,
       chargerTempC: dock.chargerTemperatureC ?? dock.charger_temperature_c ?? 0,
@@ -74,6 +77,7 @@ export function adaptDJIDock(raw: any): { state: UnifiedRobotState; alerts: Unif
       },
       hasUavInside: dock.uavInside ?? dock.uav_inside ?? false,
     },
+    // 机巢内有无人机时才填充 UAV 遥测
     uav: uav ? {
       batteryPct: uav.batteryPercent ?? uav.battery_percent ?? 0,
       batteryCycles: uav.batteryCycles ?? uav.battery_cycles ?? 0,

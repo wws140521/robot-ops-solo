@@ -13,10 +13,10 @@ import { isIndustrialArm } from '../lib/robotType'
 import { getBrandConfig } from '../lib/brandRegistry'
 import { Canvas } from '@react-three/fiber'
 
-// 工业品牌集合
+// 工业品牌集合，决定右侧详情面板是否渲染 3D 机械臂模型与关节负载
 const INDUSTRIAL_BRANDS = new Set(['FANUC', 'KUKA', 'ESTUN', 'YASKAWA'])
 
-// 允许下发的指令白名单（P6 安全加固：拒绝任意透传）
+// 允许下发的指令白名单（P6 安全加固：拒绝任意透传，避免前端 topic 被篡改后直接下发）
 const COMMAND_MAP: Record<string, { topic: string; label: string; destructive: boolean }> = {
   start:  { topic: '/cmd/start',  label: '启动', destructive: false },
   stop:   { topic: '/cmd/stop',   label: '停止', destructive: true  },
@@ -40,6 +40,7 @@ const STATUS_LABELS: Record<string, string> = {
   charging: '充电中',
 }
 
+// 机器人管理页面，左侧列表、中间 3D、右侧详情
 export function RobotsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -54,6 +55,7 @@ export function RobotsPage() {
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
 
   const robotList = Object.values(robots)
+  // URL 带 id 时显示指定机器人，否则默认选中列表第一台；刷新后不会丢失选中状态
   const selected = id ? robots[id] : robotList[0]
 
   const showToast = useCallback((msg: string, type: 'ok' | 'err') => {
@@ -61,12 +63,13 @@ export function RobotsPage() {
     setTimeout(() => setToast(null), 3000)
   }, [])
 
+  // 下发控制指令，破坏性操作要连点两次确认
   const handleCommand = useCallback(
     (cmdKey: string) => {
       const cmd = COMMAND_MAP[cmdKey]
       if (!cmd || !selected) return
 
-      // 破坏性操作需二次确认
+      // 破坏性操作（停止/回充/重启）需连续点击两次确认，4 秒超时自动取消，防误触
       if (cmd.destructive && confirmCmd !== cmdKey) {
         setConfirmCmd(cmdKey)
         setTimeout(() => setConfirmCmd(null), 4000)
@@ -721,6 +724,7 @@ export function RobotsPage() {
   )
 }
 
+// 详情面板的小标题组件
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div

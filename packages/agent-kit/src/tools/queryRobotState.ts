@@ -1,6 +1,7 @@
 import type { Tool } from './types'
 import { getRobotState } from './state-source'
 
+// 查询机器人当前运行状态，给 agent 或 UI 用
 export const queryRobotState: Tool = {
   name: 'queryRobotState',
   description: '查询指定机器人的当前运行状态（健康分/关节数据/运行时间/告警数）',
@@ -17,6 +18,7 @@ export const queryRobotState: Tool = {
     if (!state) return { error: `未找到机器人 ${robot_id}` }
 
     const joints = state.industrial?.joints ?? []
+    // 关节没有 health_score 时按 100 算，避免缺数据拉低平均分
     const avgHealth = joints.length
       ? joints.reduce((sum, j) => sum + (j.health_score ?? 100), 0) / joints.length
       : 100

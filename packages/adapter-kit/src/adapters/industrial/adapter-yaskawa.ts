@@ -1,6 +1,4 @@
-/**
- * 安川 Ethernet → UnifiedRobotState 适配器
- */
+// 安川 Ethernet → UnifiedRobotState 适配器
 import type { UnifiedRobotState, UnifiedAlert } from '../../types/unified';
 import type {
   JointTelemetry,
@@ -18,6 +16,7 @@ const YASKAWA_ALARM_MAP: Record<string, { udm_code: string; severity: AlarmSever
   '4400': { udm_code: 'ENCODER_ERR', severity: 'error', zh_desc: '编码器异常' },
 };
 
+// 安川 Ethernet 原始报文 → UDM，告警码按 YASKAWA_ALARM_MAP 翻译
 export function adaptYaskawa(
   raw: any
 ): { state: UnifiedRobotState; alerts: UnifiedAlert[] } {

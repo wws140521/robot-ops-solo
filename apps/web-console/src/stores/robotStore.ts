@@ -1,7 +1,9 @@
+// 机器人状态 store，管所有机器人的在线/离线/批量更新
 import { create } from 'zustand'
 import type { UnifiedRobotState } from 'robot-adapter-kit'
 import { listRobots } from '../lib/robotStorage'
 
+// store 里放啥：所有机器人对象、在线数、几个常用操作
 interface RobotStore {
   robots: Record<string, UnifiedRobotState>
   onlineCount: number
@@ -11,15 +13,16 @@ interface RobotStore {
   setOffline: (id: string) => void
   addRobot: (state: UnifiedRobotState) => void
   removeRobot: (id: string) => void
-  // 2026-08-18 离线检测：15s 超时标记，避免假在线
+  // 15s 没收到消息就标离线，避免 WS 断了还显示在线
   markOfflineIfStale: () => void
-  // 2026-08-18 从 Supabase robots 表加载初始列表，离线模式自动跳过
+  // 从 Supabase robots 表拉初始列表，离线模式自动跳过
   initFromSupabase: () => Promise<void>
 }
 
 // 2026-08-28 updateRobot 日志节流签名（id → 状态:电量整数位:在线）
 const lastRobotLogSig: Record<string, string> = {}
 
+// store 实例
 export const useRobotStore = create<RobotStore>((set) => ({
   robots: {},
   onlineCount: 0,
@@ -65,10 +68,12 @@ export const useRobotStore = create<RobotStore>((set) => ({
       return { robots: rest, onlineCount: Object.values(rest).filter((r) => r.online).length }
     }),
 
+  // 超过 15s 没更新就判离线
   markOfflineIfStale: () =>
     set((s) => {
       const now = Date.now()
-      const STALE_MS = 15000 // 15 秒无消息判离线
+      // 15 秒没消息就判离线，这个阈值是经验值，调太小会误报
+      const STALE_MS = 15000
       let changed = false
       const robots = Object.fromEntries(
         Object.entries(s.robots).map(([id, r]) => {
@@ -84,6 +89,7 @@ export const useRobotStore = create<RobotStore>((set) => ({
       return { robots, onlineCount: Object.values(robots).filter((r) => r.online).length }
     }),
 
+  // 从 Supabase 加载初始机器人列表，如果 WS 已经写入了就以 WS 为准
   initFromSupabase: async () => {
     const rows = await listRobots()
     if (rows.length === 0) return

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { saveSop, listSops, type StoredSop } from '../lib/sopStorage'
 import { FileDown, CloudUpload, FolderOpen, Play, Trash2, Download, ChevronDown, Cloud } from 'lucide-react'
 
+// SOP 编排页：编辑器 + 模板加载 + 云端保存/读取 + JSON 导出
 export function SopPage() {
   const { nodes, edges, reset, loadGraph } = useSopStore()
   const [exported, setExported] = useState('')
@@ -11,6 +12,7 @@ export function SopPage() {
   const [showCloud, setShowCloud] = useState(false)
   const [showExport, setShowExport] = useState(false)
 
+  // 把当前画布节点边线打包成 SopGraph
   function buildGraph(): SopGraph {
     return {
       id: 'sop-' + Date.now(),
@@ -25,18 +27,21 @@ export function SopPage() {
     }
   }
 
+  // 导出 JSON 预览
   const handleExport = () => {
     const payload = graphToPayload(buildGraph())
     setExported(JSON.stringify(payload, null, 2))
     setShowExport(true)
   }
 
+  // 加载内置火锅店模板
   const handleLoadTemplate = () => {
     loadGraph(HOTPOT_DINNER_V1)
     setExported('')
     setCloudMsg('✅ 已加载火锅店模板')
   }
 
+  // 保存到云端（或 localStorage 降级）
   const handleSaveCloud = async () => {
     setCloudMsg('保存中...')
     try {
@@ -48,6 +53,7 @@ export function SopPage() {
     }
   }
 
+  // 拉取云端模板列表
   const handleLoadCloud = async () => {
     setCloudMsg('加载列表中...')
     try {
@@ -60,6 +66,7 @@ export function SopPage() {
     }
   }
 
+  // 点击云端模板加载到画布
   const handlePickCloud = (sop: StoredSop) => {
     loadGraph(sop.graph)
     setShowCloud(false)

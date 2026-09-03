@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { createSimulator, HOTPOT_DINNER_V1, type SopGraph } from 'sop-editor'
 import { Play, Square, Volume2, ClipboardList, Soup } from 'lucide-react'
 
+// SOP 模拟运行页：按图执行，输出日志、电量、模拟时钟
 export function SopSimPage() {
   const graph: SopGraph = HOTPOT_DINNER_V1
   const [logs, setLogs] = useState<string[]>([])
@@ -11,9 +12,11 @@ export function SopSimPage() {
   const [simTime, setSimTime] = useState('18:00')
   const simRef = useRef<{ stop: () => void } | null>(null)
 
+  // 加一条日志，最多保留最近 80 条
   const addLog = (msg: string) =>
     setLogs((prev) => [...prev.slice(-80), `[${new Date().toLocaleTimeString()}] ${msg}`])
 
+  // 启动模拟器，重置状态并开始执行
   const start = async () => {
     setRunning(true)
     setLogs([])
@@ -43,12 +46,14 @@ export function SopSimPage() {
     await sim.start()
   }
 
+  // 手动停止模拟
   const stop = () => {
     simRef.current?.stop()
     setRunning(false)
     addLog('⏹ 已手动停止')
   }
 
+  // 根据日志里的关键词给不同颜色，方便一眼定位
   const logColor = (log: string) =>
     log.includes('⚠️') ? '#f87171'
     : log.includes('🔊') ? '#fbbf24'

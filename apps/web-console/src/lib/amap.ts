@@ -1,12 +1,12 @@
-// 2026-08-29 高德地图 JS API 封装
-// POI 搜索 / 地理编码 / 逆地理编码
-// 注意：需要在 index.html 注入 AMap JS API + securityJsCode（见 .env VITE_AMAP_JS_KEY）
+// 高德地图 JS API 封装
+// 提供 POI 搜索、地理编码、逆地理编码
+// 注意：正式用要在 index.html 里注入 AMap JS API + securityJsCode，.env 里配 VITE_AMAP_JS_KEY
 
 declare global {
   interface Window { AMap: any }
 }
 
-/** 等 AMap JS API 加载完成 */
+// 等 AMap JS API 加载完成，已经加载就直接返回
 export function getAMap(): Promise<any> {
   return new Promise((resolve, reject) => {
     // 已经加载
@@ -57,7 +57,7 @@ export interface POI {
   type?: string
 }
 
-/** 关键字搜索（JS 端，适合少量点 / 交互搜索） */
+// 关键字搜索 POI，默认北京，适合页面上的交互搜索
 export async function searchPOI(keyword: string, city = '北京'): Promise<POI[]> {
   const AMap = await getAMap()
   return new Promise((resolve, reject) => {
@@ -77,7 +77,7 @@ export async function searchPOI(keyword: string, city = '北京'): Promise<POI[]
   })
 }
 
-/** 地理编码：地址 → 经纬度 */
+// 地理编码：地址转成经纬度
 export async function geocode(address: string, city = '北京') {
   const AMap = await getAMap()
   return new Promise<{ lng: number; lat: number }>((resolve, reject) => {
@@ -91,7 +91,7 @@ export async function geocode(address: string, city = '北京') {
   })
 }
 
-/** 逆地理编码：经纬度 → 地址（机器人上报时用） */
+// 逆地理编码：经纬度转地址，机器人上报 GPS 时可以用来显示位置
 export async function regeocode(lng: number, lat: number) {
   const AMap = await getAMap()
   return new Promise<any>((resolve, reject) => {

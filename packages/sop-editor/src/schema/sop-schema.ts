@@ -164,7 +164,8 @@ export interface SopGraph {
   updatedAt?: number
 }
 
-// 从画布导出为可下发 JSON
+// 把画布数据导出成下发给机器人的 JSON
+// 边按 source 聚合到每个 step 的 next 数组，省得真机再建邻接表
 export function graphToPayload(graph: SopGraph): object {
   return {
     task_id: graph.id,

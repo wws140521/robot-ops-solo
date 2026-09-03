@@ -1,6 +1,7 @@
 import type { Tool } from './types'
 import { getRobotState } from './state-source'
 
+// 查询健康分，返回整体分和最差的那几个关节
 export const queryHealthScore: Tool = {
   name: 'queryHealthScore',
   description: '查询机器人整体健康分及关节级健康分，用于"哪台最该保养"排序',
@@ -18,6 +19,7 @@ export const queryHealthScore: Tool = {
     if (!state) return { error: `未找到机器人 ${robot_id}` }
 
     const joints = state.industrial?.joints ?? []
+    // 按健康分升序，取最差的 top_n 个关节返回；top_n 默认 3 足够定位问题
     const ranked = [...joints]
       .sort((a, b) => (a.health_score ?? 100) - (b.health_score ?? 100))
       .slice(0, top_n)

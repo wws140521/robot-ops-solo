@@ -1,7 +1,5 @@
-/**
- * Robot-Agent-Kit 公共入口
- * 提供 Agent 可调用的工业机器人 / 低空设备工具集
- */
+// Robot-Agent-Kit 对外总入口
+// 就是把 agent、编排器、各种 tool 集中导出，业务方只 import 这里就行
 export type { Tool, ToolParameterSchema } from './tools/types'
 
 export {

@@ -1,9 +1,5 @@
-/**
- * 科比特 / 普宙 / 道通机巢适配器（Autel 兼容 MAVLink）
- * 输入：MAVLink / 厂商 REST API 归一化后的 JSON
- * 说明：科比特、普宙、道通等国产机巢多走 MAVLink 或私有 REST，
- *       边缘侧先归一化为统一 raw 结构，此处仅做 UDM 映射。
- */
+// Autel 机巢适配器，科比特/普宙/道通之类国产机巢也走这套
+// 边缘侧已经把 MAVLink 或私有 REST 归一化成 raw JSON，这里只做 UDM 映射
 import type { UnifiedRobotState, UnifiedAlert, UAV_ALARM_CODES } from '../../types/unified'
 
 type AlarmCode = typeof UAV_ALARM_CODES[keyof typeof UAV_ALARM_CODES]
@@ -15,10 +11,12 @@ export function adaptAutelDock(raw: any): { state: UnifiedRobotState; alerts: Un
   const robotId = `AUTEL_DOCK_${raw.id ?? raw.dockId ?? 'UNKNOWN'}`
   const alarms: UnifiedAlert[] = []
 
+  // 统一封装告警，和 DJI 适配器保持一致
   const pushAlarm = (code: AlarmCode, level: 'info' | 'warn' | 'error', message: string) => {
     alarms.push({ robotId, level, code, message, timestamp: Date.now() })
   }
 
+  // 机巢侧告警：温度、舱门、升降台
   if ((raw.chargerTempC ?? raw.charger_temp_c ?? 0) > 60) {
     pushAlarm('UAV_DOCK_CHARGER_OVER_TEMP', 'error', '机巢充电器过温')
   }
@@ -28,12 +26,14 @@ export function adaptAutelDock(raw: any): { state: UnifiedRobotState; alerts: Un
   if (raw.liftFault ?? raw.lift_fault) {
     pushAlarm('UAV_DOCK_LIFT_FAULT', 'error', '升降平台故障')
   }
+  // 无人机侧告警：电量低
   if ((raw.uavBatteryPct ?? raw.uav_battery_pct ?? 100) < 15) {
     pushAlarm('UAV_BATTERY_LOW', 'warn', '无人机电量低')
   }
 
   const dockState = (raw.state ?? raw.dock_state ?? 'idle') as DockState
 
+  // 状态映射与 DJI 保持一致：有 error 级告警时整体标 error
   const state: UnifiedRobotState = {
     robotId,
     brand: 'autel-dock',
@@ -69,12 +69,14 @@ export function adaptAutelDock(raw: any): { state: UnifiedRobotState; alerts: Un
   return { state, alerts: alarms }
 }
 
+// 舱门状态优先级：卡死 > 打开 > 关闭
 function doorState(raw: any): DockDoorState {
   if (raw.doorJammed ?? raw.door_jammed) return 'jammed'
   if (raw.doorOpen ?? raw.door_open) return 'open'
   return 'closed'
 }
 
+// 升降台状态优先级：故障 > 上升 > 移动中 > 下降
 function liftState(raw: any): DockLiftState {
   if (raw.liftFault ?? raw.lift_fault) return 'fault'
   if (raw.liftUp ?? raw.lift_up) return 'up'

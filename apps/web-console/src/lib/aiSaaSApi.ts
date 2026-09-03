@@ -1,9 +1,5 @@
-/**
- * AI SaaS API 封装
- * 调用外部 AI SaaS 项目的接口
- * 输入：机器人遥测数据（IndustrialExtension）
- * 输出：中文告警摘要 + 排查建议 + 健康分
- */
+// AI SaaS API 封装，调外部 AI 服务做告警摘要和排查建议
+// 没配 URL 时走本地 mock，先糊弄一下 UI
 import type { IndustrialExtension } from 'robot-adapter-kit'
 
 const AI_SAAS_URL = import.meta.env.VITE_AI_SAAS_URL || ''
@@ -16,7 +12,8 @@ export interface AIInsightResult {
   confidence: number
 }
 
-// Mock 数据（AI SaaS 未配置时返回本地分析结果）
+// AI SaaS 没配 URL 时的本地 mock，按几个简单阈值给建议
+// 负载>80%、温度>50℃、RUL<30 天都是现场常用的维护触发线
 function mockInsight(robotId: string, industrial: IndustrialExtension): AIInsightResult {
   const highLoadJoints = industrial.joints.filter((j) => j.load_pct > 80)
   const hotJoints = industrial.joints.filter((j) => (j.temp_c ?? 0) > 50)
@@ -54,12 +51,13 @@ function mockInsight(robotId: string, industrial: IndustrialExtension): AIInsigh
   }
 }
 
+// 调 AI SaaS 分析接口，没配就 mock
 export async function fetchAIInsight(
   robotId: string,
   industrial: IndustrialExtension
 ): Promise<AIInsightResult> {
   if (!AI_SAAS_URL) {
-    // AI SaaS 未配置，返回 mock 分析
+    // AI SaaS 未配置时模拟 600ms 网络延迟，保持 UI 加载状态一致
     return new Promise((resolve) => {
       setTimeout(() => resolve(mockInsight(robotId, industrial)), 600)
     })
@@ -85,6 +83,7 @@ export async function fetchAIInsight(
   return res.json()
 }
 
+// 自然语言问答接口，现在没配 URL 直接返回提示
 export async function fetchAINaturalQuery(
   robotId: string,
   question: string,

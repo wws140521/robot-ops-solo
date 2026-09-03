@@ -5,7 +5,8 @@ import { supabase, isSupabaseEnabled } from './supabase'
 import { useRobotStore } from '../stores/robotStore'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
-// 订阅单台机器人的实时状态（robot_states 表 INSERT 事件）
+// 订阅单台机器人的实时状态，INSERT 事件来了就更新 store
+// robot_states 表没有 brand/model，要从 store 里补，避免覆盖成 unknown
 export function subscribeRobotStates(robotId: string): RealtimeChannel | null {
   if (!isSupabaseEnabled) return null
 
@@ -30,7 +31,7 @@ export function subscribeRobotStates(robotId: string): RealtimeChannel | null {
           error_code?: string
           created_at?: string
         }
-        // brand/model 从 store 现有值取，没有才用 'unknown'（robot_states 表无此字段）
+        // robot_states 表无 brand/model 字段，从 store 现有值补回；首次订阅 fallback 到 unknown
         const existing = useRobotStore.getState().robots[robotId]
         useRobotStore.getState().updateRobot(robotId, {
           robotId,
@@ -50,7 +51,7 @@ export function subscribeRobotStates(robotId: string): RealtimeChannel | null {
     .subscribe()
 }
 
-// 订阅全租户新告警（alerts 表 INSERT 事件）
+// 订阅全租户新告警，alerts 表有 INSERT 就回调
 export function subscribeAlerts(onNewAlert: (alert: unknown) => void): RealtimeChannel | null {
   if (!isSupabaseEnabled) return null
 

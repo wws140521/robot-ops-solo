@@ -1,6 +1,4 @@
-/**
- * FANUC FOCAS → UnifiedRobotState 适配器
- */
+// FANUC FOCAS → UnifiedRobotState 适配器
 import type { UnifiedRobotState, UnifiedAlert } from '../../types/unified';
 import type {
   JointTelemetry,
@@ -9,6 +7,7 @@ import type {
   IndustrialExtension,
 } from '../../types/industrial';
 
+// FANUC 原始报文 → UDM，FOCAS 协议字段基本不用转，直接对齐就行
 export function adaptFanuc(
   raw: any
 ): { state: UnifiedRobotState; alerts: UnifiedAlert[] } {

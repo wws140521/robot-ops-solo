@@ -1,17 +1,15 @@
-/**
- * 工业机器人专有类型定义
- * 所有字段对应 UDM（Unified Data Model）JSON Schema v1.0
- */
+// 工业机器人专有类型，UDM JSON Schema 那套东西
+// 字段名尽量和现场工程师说的一致，别整太抽象
 
 // ─── 单关节遥测 ─────────────────────────────────
 export interface JointTelemetry {
   j: number;              // 关节号 1-6
   angle_rad?: number;     // 当前关节角（弧度）· 驱动 3D 模型旋转
-  load_pct: number;       // 转矩负载率 %（0-200）
+  load_pct: number;       // 转矩负载率 %（0-200），超过 100 意味短时超载
   temp_c?: number;        // 电机温度 ℃
   current_a?: number;     // 伺服电流 A
   speed_rpm?: number;     // 转速
-  health_score?: number;  // 健康分 0-100
+  health_score?: number;  // 健康分 0-100，缺失时按 100 算避免拉低均值
   rul_days?: number;      // 剩余使用寿命预测（天）
 }
 
@@ -43,7 +41,7 @@ export interface IndustrialExtension {
   alarms: IndustrialAlarm[];
   runtime: IndustrialRuntime;
   protocol: string;       // "FOCAS" | "OPC_UA" | "MODBUS_TCP" | "ETHERNET_KRL"
-  /** 品牌特有扩展数据（R 寄存器/安全门状态等） */
+  // 品牌特有扩展数据（R 寄存器/安全门状态/伺服参数等），UI 按 brand 解析
   extensions?: Record<string, string | number | boolean>;
 }
 

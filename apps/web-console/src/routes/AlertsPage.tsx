@@ -7,17 +7,19 @@ import './AlertsPage.css'
 
 type FilterLevel = 'all' | 'error' | 'warn' | 'info'
 
-// 工业告警识别：消息格式为 "[raw_code] zh_desc"（如 "[SRVO-023] 2轴伺服过热"）
+// 从告警消息里拆出原厂码和中文描述，工业告警格式是 "[SRVO-023] 2轴伺服过热"
 function parseIndustrialAlert(message: string): { rawCode: string; zhDesc: string } | null {
   const match = message.match(/^\[([^\]]+)\]\s*(.+)$/)
   if (!match) return null
   const rawCode = match[1]
   // 工业品牌报警码前缀：FANUC(SRVO-) / KUKA(KSS) / 埃斯顿(EST-) / 安川(纯数字)
+  // 纯数字至少 3 位，避免把普通编号误判成告警码
   const isIndustrial = /^(SRVO-|KSS|EST-|\d{3,})/.test(rawCode)
   if (!isIndustrial) return null
   return { rawCode, zhDesc: match[2] }
 }
 
+// 告警中心页面
 export function AlertsPage() {
   const alerts = useAlertStore((s) => s.alerts)
   const unreadCount = useAlertStore((s) => s.unreadCount)
@@ -34,6 +36,7 @@ export function AlertsPage() {
     setReadIds(new Set(alerts.map((a) => a.timestamp)))
   }
 
+  // 告警列表按级别/关键词过滤；消息正文也纳入搜索，方便按设备 ID 或报警码定位
   const filteredAlerts = useMemo(() => {
     let list = alerts
     if (filter !== 'all') list = list.filter((a) => a.level === filter)
@@ -54,7 +57,7 @@ export function AlertsPage() {
     info: alerts.filter((a) => a.level === 'info').length,
   }), [alerts])
 
-  // 生成时间轴数据
+  // 生成时间轴数据：工业告警拆分出原厂码与中文描述，其他告警直接显示消息
   const timelineItems: TimelineItem[] = filteredAlerts.map((a) => {
     const industrial = parseIndustrialAlert(a.message)
     return {

@@ -18,6 +18,7 @@ let client: mqtt.MqttClient | null = null;
 let onTelemetry: TelemetryCallback | null = null;
 let onOtaStatus: OtaStatusCallback | null = null;
 
+// 连 MQTT broker，订阅遥测和 OTA 主题，收到消息就回调给上层
 export function connectMqtt(callback: TelemetryCallback, otaCallback?: OtaStatusCallback) {
   onTelemetry = callback;
   onOtaStatus = otaCallback ?? null;
@@ -79,6 +80,7 @@ export function connectMqtt(callback: TelemetryCallback, otaCallback?: OtaStatus
   });
 }
 
+// 断开 MQTT，清理 client
 export function disconnectMqtt() {
   if (client) {
     client.end();
