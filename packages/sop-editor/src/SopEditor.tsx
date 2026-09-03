@@ -14,9 +14,10 @@ import {
   type Connection,
   type Node,
   type EdgeProps,
+  type ReactFlowInstance,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { MoveNode } from './nodes/MoveNode'
 import { SpeakNode } from './nodes/SpeakNode'
 import { WaitNode } from './nodes/WaitNode'
@@ -146,6 +147,8 @@ export function SopEditor() {
 
   const [nodes, setLocalNodes, onNodesChange] = useNodesState(storeNodes as unknown as Node[])
   const [edges, setLocalEdges, onEdgesChange] = useEdgesState(storeEdges)
+  const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null)
+  const flowWrapperRef = useRef<HTMLDivElement>(null)
 
   // store 变更（loadGraph/reset/addNode/updateNode）同步到画布本地状态；拖拽只改本地不触发
   useEffect(() => {
@@ -166,7 +169,21 @@ export function SopEditor() {
     [edges, setEdges, setLocalEdges]
   )
 
+  // 点击节点库时，把节点放到当前画布可视区域的正中间，而不是左上角
   const handleAddNode = (node: SopNode) => {
+    const wrapper = flowWrapperRef.current
+    if (rfInstance && wrapper) {
+      const rect = wrapper.getBoundingClientRect()
+      const center = rfInstance.screenToFlowPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      })
+      // 稍微错开一点，避免多个节点完全重叠
+      node.position = {
+        x: center.x - 80 + Math.random() * 40,
+        y: center.y - 40 + Math.random() * 40,
+      }
+    }
     addNode(node)
     setLocalNodes([...nodes, node as unknown as Node])
   }
@@ -193,7 +210,7 @@ export function SopEditor() {
       `}</style>
       <div style={{ display: 'flex', width: '100%', height: '100%', minHeight: 500 }}>
       <NodePalette onAdd={handleAddNode} />
-      <div style={{ flex: 1 }}>
+      <div ref={flowWrapperRef} style={{ flex: 1 }}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -201,6 +218,7 @@ export function SopEditor() {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeDoubleClick={onNodeDoubleClick}
+          onInit={(instance) => setRfInstance(instance as unknown as ReactFlowInstance)}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
