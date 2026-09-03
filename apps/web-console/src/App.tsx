@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { TenantBranding } from './components/layout/TenantBranding'
@@ -25,6 +25,12 @@ import { useRobotStore } from './stores/robotStore'
 import { useThemeStore } from './stores/themeStore'
 import { pushWebhook } from './lib/webhook'
 
+// 老 /robots 路径兼容重定向，把 id 也带过去，避免外部书签失效
+function RobotsRedirect() {
+  const { id } = useParams()
+  return <Navigate to={id ? `/devices/${id}` : '/devices'} replace />
+}
+
 // 主布局（侧边栏 + 受保护路由）
 function MainLayout() {
   return (
@@ -33,8 +39,10 @@ function MainLayout() {
       <main className="main-content">
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/robots" element={<RobotsPage />} />
-          <Route path="/robots/:id" element={<RobotsPage />} />
+          <Route path="/devices" element={<RobotsPage />} />
+          <Route path="/devices/:id" element={<RobotsPage />} />
+          <Route path="/robots" element={<RobotsRedirect />} />
+          <Route path="/robots/:id" element={<RobotsRedirect />} />
           <Route path="/sop" element={<SopPage />} />
           <Route path="/sop-sim" element={<SopSimPage />} />
           <Route path="/twin" element={<TwinPage />} />

@@ -204,7 +204,7 @@ export function RobotsPage() {
               return (
                 <div
                   key={r.robotId}
-                  onClick={() => navigate(`/robots/${r.robotId}`)}
+                  onClick={() => navigate(`/devices/${r.robotId}`)}
                   style={{
                     cursor: 'pointer',
                     padding: '10px 12px',

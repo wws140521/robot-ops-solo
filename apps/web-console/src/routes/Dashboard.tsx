@@ -361,7 +361,7 @@ export function Dashboard() {
               return (
                 <div
                   key={r.robotId}
-                  onClick={() => navigate(`/robots/${r.robotId}`)}
+                  onClick={() => navigate(`/devices/${r.robotId}`)}
                   style={{
                     position: 'relative',
                     padding: 14,
@@ -447,7 +447,7 @@ export function Dashboard() {
                 return (
                   <div
                     key={i}
-                    onClick={() => navigate(`/robots/${a.robotId}`)}
+                    onClick={() => navigate(`/devices/${a.robotId}`)}
                     style={{
                       cursor: 'pointer',
                       opacity: 1,

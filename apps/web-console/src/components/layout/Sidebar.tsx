@@ -23,7 +23,7 @@ import { getOverallConnState, subscribeConnState } from '../../lib/wsHub'
 // 侧边栏导航项，to 是路由，end 控制 NavLink 是否严格匹配
 const navItems: { to: string; label: string; icon: LucideIcon; end: boolean }[] = [
   { to: '/',           label: '仪表盘',    icon: LayoutDashboard, end: true  },
-  { to: '/robots',     label: '机器人',    icon: Bot,             end: false },
+  { to: '/devices',    label: '设备',      icon: Bot,             end: false },
   { to: '/sop',        label: 'SOP 编排', icon: Workflow,        end: false },
   { to: '/sop-sim',    label: 'SOP 模拟',  icon: Play,            end: false },
   { to: '/twin',       label: '数字孪生',  icon: Box,             end: false },
