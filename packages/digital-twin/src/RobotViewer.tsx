@@ -1,13 +1,17 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Grid, ContactShadows, AdaptiveDpr, AdaptiveEvents } from '@react-three/drei'
-import { memo, useRef } from 'react'
+import { memo, useRef, useState } from 'react'
 import { G1Humanoid } from './robots/G1Humanoid'
 import { PeanutBot } from './robots/PeanutBot'
+import { FanucArm } from './robots/FanucArm'
+import { KukaArm } from './robots/KukaArm'
+import { IndustrialRobotModel } from './robots/IndustrialRobotModel'
 import { Floor } from './environment/Floor'
 import { SceneAssets } from './environment/SceneAssets'
+import { isIndustrialBrand } from './config/industrial-models'
 
 import { useScenePalette } from './hooks/useScenePalette'
-import type { UnifiedRobotState } from 'robot-adapter-kit'
+import type { UnifiedRobotState, JointTelemetry } from 'robot-adapter-kit'
 
 interface RobotViewerProps {
   robotId: string
@@ -179,11 +183,53 @@ const SceneEnvironment = memo(function SceneEnvironment({
 function RobotBody({ state, visible = true }: { state: UnifiedRobotState; visible?: boolean }) {
   const pos: [number, number, number] = [state.position.x, 0, state.position.y]
   const rot: [number, number, number] = [0, state.position.theta, 0]
+  const [urdfFailed, setUrdfFailed] = useState(false)
+
+  // 工业关节遥测，统一从 state.industrial?.joints 读取
+  const industrialJoints = state.industrial?.joints ?? []
 
   return (
     <group visible={visible}>
       {state.brand === 'unitree' && <G1Humanoid position={pos} rotation={rot} scale={1.0} />}
       {state.brand === 'keenon' && <PeanutBot position={pos} rotation={rot} />}
+
+      {isIndustrialBrand(state.brand) && !urdfFailed && (
+        <IndustrialRobotModel
+          brand={state.brand}
+          position={pos}
+          rotation={rot}
+          joints={industrialJoints}
+          onLoadError={(err) => {
+            console.warn(`[RobotViewer] ${state.brand} 真实模型加载失败，降级到程序化机械臂:`, err.message)
+            setUrdfFailed(true)
+          }}
+        />
+      )}
+
+      {isIndustrialBrand(state.brand) && urdfFailed && (
+        <FallbackIndustrialArm brand={state.brand} position={pos} rotation={rot} joints={industrialJoints} />
+      )}
+    </group>
+  )
+}
+
+// URDF 缺失或损坏时，用原来的程序化机械臂兜底
+function FallbackIndustrialArm({
+  brand,
+  position,
+  rotation,
+  joints,
+}: {
+  brand: 'FANUC' | 'KUKA' | 'ESTUN' | 'YASKAWA'
+  position: [number, number, number]
+  rotation: [number, number, number]
+  joints: JointTelemetry[]
+}) {
+  return (
+    <group position={position} rotation={rotation}>
+      {brand === 'FANUC' && <FanucArm joints={joints} />}
+      {brand === 'KUKA' && <KukaArm joints={joints} />}
+      {(brand === 'ESTUN' || brand === 'YASKAWA') && <FanucArm joints={joints} />}
     </group>
   )
 }

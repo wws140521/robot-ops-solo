@@ -4,6 +4,13 @@ export { G1Dog } from './robots/G1Dog'
 export { PeanutBot } from './robots/PeanutBot'
 export { FanucArm } from './robots/FanucArm'
 export { KukaArm } from './robots/KukaArm'
+export { IndustrialRobotModel } from './robots/IndustrialRobotModel'
+export {
+  INDUSTRIAL_MODELS,
+  isIndustrialBrand,
+  telemetryToUrdfJoints,
+} from './config/industrial-models'
+export type { IndustrialBrand, IndustrialModelConfig } from './config/industrial-models'
 export { JointPivot, LinkSegment, JointBall } from './robots/JointChain'
 export { TrajectoryLine } from './overlays/TrajectoryLine'
 export { StatusBadge } from './overlays/StatusBadge'

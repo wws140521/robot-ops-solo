@@ -1,0 +1,113 @@
+// 工业机器人真实模型配置
+// 当 public/models/<brand>/robot.urdf 存在时，IndustrialRobotModel 会加载它
+// 否则降级到程序化机械臂（FanucArm / KukaArm）
+
+import type { JointTelemetry } from 'robot-adapter-kit'
+
+// 支持真实 URDF 加载的工业品牌
+export type IndustrialBrand = 'FANUC' | 'KUKA' | 'ESTUN' | 'YASKAWA'
+
+// 每个品牌的模型配置：URDF 路径、资源包映射、关节名映射
+export interface IndustrialModelConfig {
+  brand: IndustrialBrand
+  displayName: string
+  urdfPath: string
+  // three-urdf 的 package:// 映射，例如 { 'fanuc_support': '/models/fanuc' }
+  packageMap: Record<string, string>
+  // 遥测 joint index → URDF 关节名
+  // 索引从 1 开始，和 JointTelemetry.j 对应
+  jointMap: Record<number, string>
+  // 模型默认缩放
+  scale: number
+  // 模型底座离地高度修正（部分 URDF 原点不在地面）
+  liftY: number
+}
+
+export const INDUSTRIAL_MODELS: Record<IndustrialBrand, IndustrialModelConfig> = {
+  FANUC: {
+    brand: 'FANUC',
+    displayName: 'FANUC M-20iD',
+    urdfPath: '/models/fanuc/robot.urdf',
+    packageMap: { fanuc_support: '/models/fanuc' },
+    // 典型 6 轴映射，实际按 URDF 调整
+    jointMap: {
+      1: 'joint_1',
+      2: 'joint_2',
+      3: 'joint_3',
+      4: 'joint_4',
+      5: 'joint_5',
+      6: 'joint_6',
+    },
+    scale: 1.0,
+    liftY: 0,
+  },
+  KUKA: {
+    brand: 'KUKA',
+    displayName: 'KUKA KR 10 R1100',
+    urdfPath: '/models/kuka/robot.urdf',
+    packageMap: { kuka_kr10_support: '/models/kuka' },
+    jointMap: {
+      1: 'joint_a1',
+      2: 'joint_a2',
+      3: 'joint_a3',
+      4: 'joint_a4',
+      5: 'joint_a5',
+      6: 'joint_a6',
+    },
+    scale: 1.0,
+    liftY: 0,
+  },
+  ESTUN: {
+    brand: 'ESTUN',
+    displayName: 'ESTUN ER6',
+    urdfPath: '/models/estun/robot.urdf',
+    packageMap: { estun_support: '/models/estun' },
+    jointMap: {
+      1: 'joint_1',
+      2: 'joint_2',
+      3: 'joint_3',
+      4: 'joint_4',
+      5: 'joint_5',
+      6: 'joint_6',
+    },
+    scale: 1.0,
+    liftY: 0,
+  },
+  YASKAWA: {
+    brand: 'YASKAWA',
+    displayName: 'YASKAWA GP7',
+    urdfPath: '/models/yaskawa/robot.urdf',
+    packageMap: { yaskawa_support: '/models/yaskawa' },
+    jointMap: {
+      1: 'joint_s',
+      2: 'joint_l',
+      3: 'joint_u',
+      4: 'joint_r',
+      5: 'joint_b',
+      6: 'joint_t',
+    },
+    scale: 1.0,
+    liftY: 0,
+  },
+}
+
+// 判断品牌是否属于工业机械臂
+export function isIndustrialBrand(brand?: string): brand is IndustrialBrand {
+  if (!brand) return false
+  return Object.prototype.hasOwnProperty.call(INDUSTRIAL_MODELS, brand)
+}
+
+// 将遥测关节数组转换为 URDF 关节值映射
+export function telemetryToUrdfJoints(
+  joints: JointTelemetry[],
+  config: IndustrialModelConfig
+): Record<string, number> {
+  const result: Record<string, number> = {}
+  joints.forEach((jt) => {
+    const name = config.jointMap[jt.j]
+    if (name) {
+      result[name] = jt.angle_rad ?? 0
+    }
+  })
+  return result
+}
