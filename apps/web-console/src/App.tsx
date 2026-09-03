@@ -12,10 +12,12 @@ import { AlertsPage } from './routes/AlertsPage'
 import { TenantsPage } from './routes/TenantsPage'
 import { OtaPage } from './routes/OtaPage'
 import { FleetMapPage } from './routes/FleetMapPage'
+import { FleetPage } from './routes/FleetPage'
 import { Login } from './routes/LoginPage'
 import { SignUp } from './routes/SignUp'
 import { startWS, stopAllWS } from './lib/wsHub'
 import { SpeakBubble } from './components/overlays/SpeakBubble'
+import { ChatPanel } from './components/ChatPanel'
 import { supabase, isSupabaseEnabled } from './lib/supabase'
 import { subscribeAlerts } from './lib/realtime'
 import { useAlertStore } from './stores/alertStore'
@@ -41,6 +43,7 @@ function MainLayout() {
           <Route path="/tenants" element={<TenantsPage />} />
           <Route path="/ota" element={<OtaPage />} />
           <Route path="/fleet-map" element={<FleetMapPage />} />
+          <Route path="/fleet" element={<FleetPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
@@ -161,6 +164,8 @@ export default function App() {
         </Routes>
         {/* 全局播报气泡，所有页面都能弹 */}
         <SpeakBubble />
+        {/* AI 运维助手入口 */}
+        <ChatPanel />
       </BrowserRouter>
     </TenantBranding>
   )

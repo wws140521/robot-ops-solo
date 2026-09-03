@@ -1,20 +1,122 @@
 /**
- * 多品牌机器人卡片墙
- * 同屏渲染 FANUC / KUKA / 埃斯顿 / 安川 工业机器人
+ * 异构设备卡片墙
+ * 同屏渲染地面机器人 / 无人机机巢 / eVTOL 起降场
  * 数据来源：useRobotStore（由 wsHub MQTT 接入实时刷新）
- * 适配深色/浅色主题，统一使用 CSS 变量
  */
+import { useState, useMemo } from 'react'
 import { useRobotStore } from '../stores/robotStore'
-import type { UnifiedRobotState, JointTelemetry } from 'robot-adapter-kit'
+import type { UnifiedRobotState, DeviceClass } from 'robot-adapter-kit'
+import { DockCard } from './DockCard'
+import { VertiportCard } from './VertiportCard'
 
 const INDUSTRIAL_BRANDS = new Set(['FANUC', 'KUKA', 'ESTUN', 'YASKAWA'])
+const COMMERCIAL_BRANDS = new Set(['UNITREE', 'KEENON', 'AGIBOT', 'PUDUTECH'])
 
-// 品牌强调色（在深色主题下提高亮度的近似色，保持品牌识别度）
+const TABS: { key: DeviceClass | 'all'; label: string }[] = [
+  { key: 'all', label: '全部' },
+  { key: 'ground_robot', label: '地面机器人' },
+  { key: 'uav_dock', label: '无人机机巢' },
+  { key: 'vertiport', label: '起降场' },
+  { key: 'gateway', label: '边缘网关' },
+]
+
+function deviceClassOf(state: UnifiedRobotState): DeviceClass {
+  if (state.deviceClass) return state.deviceClass
+  if (INDUSTRIAL_BRANDS.has(state.brand.toUpperCase())) return 'ground_robot'
+  if (COMMERCIAL_BRANDS.has(state.brand.toUpperCase())) return 'ground_robot'
+  return 'ground_robot'
+}
+
+function DeviceCard({ device }: { device: UnifiedRobotState }) {
+  const cls = deviceClassOf(device)
+  switch (cls) {
+    case 'uav_dock':
+      return <DockCard device={device} />
+    case 'vertiport':
+      return <VertiportCard device={device} />
+    case 'ground_robot':
+    default:
+      return <IndustrialCard state={device} />
+  }
+}
+
+export function RobotCards() {
+  const robots = useRobotStore((s) => s.robots)
+  const [tab, setTab] = useState<DeviceClass | 'all'>('all')
+
+  const list = useMemo(() => {
+    return Object.values(robots).filter((r) => {
+      return tab === 'all' || deviceClassOf(r) === tab
+    })
+  }, [robots, tab])
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* 设备类 Tab 过滤 */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            style={{
+              padding: '6px 14px',
+              fontSize: 12,
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border-base)',
+              background: tab === t.key ? 'var(--primary-dim)' : 'transparent',
+              color: tab === t.key ? 'var(--primary)' : 'var(--text-secondary)',
+              fontFamily: 'var(--font-mono)',
+              transition: 'all 0.2s',
+              cursor: 'pointer',
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {list.length === 0 && (
+        <div
+          style={{
+            padding: 28,
+            textAlign: 'center',
+            color: 'var(--text-tertiary)',
+            fontSize: 13,
+          }}
+        >
+          等待设备数据接入…<br />
+          <span style={{ fontSize: 11, opacity: 0.7 }}>
+            请确认 MQTT 与对应采集器已启动
+          </span>
+        </div>
+      )}
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+          gap: 14,
+        }}
+      >
+        {list.map((r) => (
+          <DeviceCard key={r.robotId} device={r} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── 原有工业/地面机器人卡片（保留，作为 ground_robot 默认渲染） ─────────
+
 const BRAND_ACCENT: Record<string, string> = {
   FANUC: '#2B9DFF',
   KUKA: '#FF3B5C',
   ESTUN: '#22D386',
   YASKAWA: '#FF9A1E',
+  UNITREE: '#F5A623',
+  KEENON: '#00C2A8',
+  AGIBOT: '#9B59B6',
+  PUDUTECH: '#E74C3C',
 }
 
 function brandAccent(brand: string): string {
@@ -33,8 +135,7 @@ function loadColor(loadPct: number): string {
   return 'var(--status-online)'
 }
 
-// 由关节健康分计算整机健康分
-function overallHealth(joints: JointTelemetry[]): number {
+function overallHealth(joints: any[]): number {
   if (joints.length === 0) return 0
   return Math.round(
     joints.reduce((s, j) => s + (j.health_score ?? 100), 0) / joints.length
@@ -60,45 +161,6 @@ const td: React.CSSProperties = {
   borderBottom: '1px solid var(--border-subtle)',
 }
 
-export function RobotCards() {
-  const robots = useRobotStore((s) => s.robots)
-  const list = Object.values(robots).filter((r) =>
-    INDUSTRIAL_BRANDS.has(r.brand.toUpperCase())
-  )
-
-  if (list.length === 0) {
-    return (
-      <div
-        style={{
-          padding: 28,
-          textAlign: 'center',
-          color: 'var(--text-tertiary)',
-          fontSize: 13,
-        }}
-      >
-        等待 MQTT 工业数据接入…<br />
-        <span style={{ fontSize: 11, opacity: 0.7 }}>
-          请确认 mosquitto(9001) 与 fanuc_mock.py / kuka_mock.py 已启动
-        </span>
-      </div>
-    )
-  }
-
-  return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-        gap: 14,
-      }}
-    >
-      {list.map((r) => (
-        <IndustrialCard key={r.robotId} state={r} />
-      ))}
-    </div>
-  )
-}
-
 function IndustrialCard({ state }: { state: UnifiedRobotState }) {
   const ind = state.industrial
   const accent = brandAccent(state.brand)
@@ -119,7 +181,6 @@ function IndustrialCard({ state }: { state: UnifiedRobotState }) {
         gap: 12,
       }}
     >
-      {/* 头部：品牌 + 型号 + ID */}
       <div
         style={{
           display: 'flex',
@@ -160,7 +221,6 @@ function IndustrialCard({ state }: { state: UnifiedRobotState }) {
         </span>
       </div>
 
-      {/* 健康分 + 协议 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div
           style={{
@@ -194,7 +254,6 @@ function IndustrialCard({ state }: { state: UnifiedRobotState }) {
         </div>
       </div>
 
-      {/* 关节表格 */}
       {joints.length > 0 && (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
@@ -226,7 +285,6 @@ function IndustrialCard({ state }: { state: UnifiedRobotState }) {
         </table>
       )}
 
-      {/* 活跃告警条 */}
       {activeAlarms.length > 0 && (
         <div
           style={{

@@ -1,5 +1,57 @@
 // 2026-08-18 设计 UDM 统一模型，解决多品牌字段不一致问题（FOCAS/OPC UA/Modbus 互不通）
+// 2026-09-02 低空扩展：将无人机机巢 / eVTOL 起降场 / 边缘网关作为独立 device_class 接入
 import type { IndustrialExtension } from './industrial'
+
+/**
+ * 设备大类：保持地面机器人不变，新增低空与地面基建类设备
+ */
+export type DeviceClass =
+  | 'ground_robot'   // 地面工业机器人 / 商用机器人（原有）
+  | 'uav_dock'       // 无人机自动机巢
+  | 'uav'            // 无人机本体状态（仅遥测，不涉飞控）
+  | 'vertiport'      // eVTOL 起降场地面设施
+  | 'gateway'        // 通感基站 / 边缘网关
+
+/** 机巢运行状态 */
+export type UAVDockState = 'idle' | 'charging' | 'launching' | 'landing' | 'maintenance' | 'fault'
+
+/** 无人机本体遥测（不含飞控 / 航线 / 载荷） */
+export interface UAVTelemetry {
+  batteryPct: number        // 电量 0-100
+  batteryCycles: number     // 充放电循环次数
+  signalRssi: number        // 图传/数传信号 dBm
+  gpsSatellites: number     // 搜星数
+  motorTemps: number[]      // 各电机温度 ℃
+  propellerRpm: number[]    // 各桨转速
+  lastFlightId?: string     // 最近一次飞行任务 ID（仅标识，不含轨迹）
+}
+
+/** 自动机巢遥测 */
+export interface DockTelemetry {
+  dockState: UAVDockState
+  chargerTempC: number      // 充电器温度
+  chargerVoltageV: number   // 充电电压
+  chargerCurrentA: number   // 充电电流
+  doorState: 'open' | 'closed' | 'jammed'
+  liftPlatform: 'up' | 'down' | 'moving' | 'fault'
+  weather: {
+    windSpeedMps: number
+    windGustMps: number
+    rainfallMm: number
+    temperatureC: number
+    humidityPct: number
+  }
+  hasUavInside: boolean
+}
+
+/** eVTOL 起降场地面设施遥测 */
+export interface VertiportTelemetry {
+  chargingPadState: 'available' | 'charging' | 'fault'
+  chargingCurrentA: number
+  fireSuppression: 'armed' | 'discharged' | 'fault'
+  lighting: 'on' | 'off' | 'auto'
+  groundPowerVoltageV: number
+}
 
 export interface UnifiedRobotState {
   robotId: string
@@ -35,7 +87,29 @@ export interface UnifiedRobotState {
     heading?: number  // 0-360 正北=0（度）
     speed?: number    // m/s
   }
+  /**
+   * 2026-09-02 设备分类（默认 ground_robot）
+   */
+  deviceClass?: DeviceClass
+  /** 无人机本体遥测（仅 device_class='uav' 或机巢内无人机时填充） */
+  uav?: UAVTelemetry
+  /** 自动机巢遥测（device_class='uav_dock'） */
+  dock?: DockTelemetry
+  /** eVTOL 起降场地面设施遥测（device_class='vertiport'） */
+  vertiport?: VertiportTelemetry
 }
+
+/** 低空 / 机巢统一告警码命名空间 */
+export const UAV_ALARM_CODES = {
+  DOCK_CHARGER_OVER_TEMP: 'UAV_DOCK_CHARGER_OVER_TEMP',
+  DOCK_DOOR_JAMMED: 'UAV_DOCK_DOOR_JAMMED',
+  DOCK_LIFT_FAULT: 'UAV_DOCK_LIFT_FAULT',
+  UAV_BATTERY_LOW: 'UAV_BATTERY_LOW',
+  UAV_MOTOR_OVER_TEMP: 'UAV_MOTOR_OVER_TEMP',
+  UAV_SIGNAL_WEAK: 'UAV_SIGNAL_WEAK',
+  VERTIPORT_FIRE_FAULT: 'VERTIPORT_FIRE_FAULT',
+  VERTIPORT_PAD_FAULT: 'VERTIPORT_PAD_FAULT',
+} as const
 
 // 2026-08-18 统一告警模型，所有品牌告警码翻译为 info/warn/error 三级
 export interface UnifiedAlert {

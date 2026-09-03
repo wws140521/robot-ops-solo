@@ -21,6 +21,7 @@
     "react-dom": "^18.3.0",
     "react-router-dom": "^6.26.0",
     "robot-adapter-kit": "workspace:*",
+    "robot-agent-kit": "workspace:*",
     "sop-editor": "workspace:*",
     "three": "^0.165.0",
     "three-urdf": "^0.1.1",

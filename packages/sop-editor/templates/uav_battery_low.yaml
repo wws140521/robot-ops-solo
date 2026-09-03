@@ -1,0 +1,20 @@
+alarm_code: UAV_BATTERY_LOW
+title: 无人机电量低处置
+estimated_minutes: 10
+steps:
+  - id: 1
+    title: 确认电量
+    detail: 无人机电量 <15%，确认是否在机巢内。
+    require_photo: false
+  - id: 2
+    title: 若在机巢内
+    detail: 确认自动充电已启动；若未启动，检查充电器与电池接触。
+    require_photo: true
+  - id: 3
+    title: 若在执行任务
+    detail: 通过飞行运营平台（非本系统）触发返航；本系统仅记录告警。
+    require_photo: false
+  - id: 4
+    title: 闭环
+    detail: 电量回升至 >50% 标记完成。
+    require_photo: false

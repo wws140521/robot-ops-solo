@@ -27,6 +27,7 @@ const navItems: { to: string; label: string; icon: LucideIcon; end: boolean }[] 
   { to: '/sop-sim',    label: 'SOP 模拟',  icon: Play,            end: false },
   { to: '/twin',       label: '数字孪生',  icon: Box,             end: false },
   { to: '/fleet-map',  label: '室外地图',  icon: Map,             end: false },
+  { to: '/fleet',      label: '设备总览',  icon: Bot,             end: false },
   { to: '/alerts',     label: '告警中心',  icon: Bell,            end: false },
   { to: '/tenants',    label: '租户管理',  icon: Building2,       end: false },
   { to: '/ota',        label: 'OTA 升级',  icon: DownloadCloud,   end: false },

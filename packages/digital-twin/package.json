@@ -19,6 +19,9 @@
     "@types/three": "^0.165.0",
     "typescript": "^5.5.0"
   },
+  "scripts": {
+    "build": "tsc --noEmit"
+  },
   "peerDependencies": {
     "react": "^18.0.0"
   }

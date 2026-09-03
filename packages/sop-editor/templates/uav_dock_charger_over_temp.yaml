@@ -1,0 +1,24 @@
+alarm_code: UAV_DOCK_CHARGER_OVER_TEMP
+title: 机巢充电器过温处置
+estimated_minutes: 15
+steps:
+  - id: 1
+    title: 确认告警
+    detail: 在 Dashboard 查看机巢 {robot_id} 充电器温度，>60℃ 触发。
+    require_photo: false
+  - id: 2
+    title: 远程停止充电
+    detail: 下发 command 停止充电（仅地面操作，不涉飞行）。
+    require_photo: false
+  - id: 3
+    title: 检查散热风扇
+    detail: 现场确认机巢散热风扇是否运转、滤网是否堵塞。
+    require_photo: true
+  - id: 4
+    title: 清洁或更换滤网
+    detail: 清洁滤网后重启充电，观察 5 分钟温度曲线。
+    require_photo: true
+  - id: 5
+    title: 闭环确认
+    detail: 温度回落至 45℃ 以下，标记 SOP 完成。
+    require_photo: false

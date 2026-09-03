@@ -1,0 +1,20 @@
+alarm_code: UAV_DOCK_DOOR_JAMMED
+title: 机巢舱门卡死处置
+estimated_minutes: 30
+steps:
+  - id: 1
+    title: 确认舱门状态
+    detail: Dashboard 显示 door_state=jammed，切勿强行手动开启。
+    require_photo: true
+  - id: 2
+    title: 远程下发复位
+    detail: 下发 command 复位舱门（地面操作）。
+    require_photo: false
+  - id: 3
+    title: 复位失败则派单
+    detail: 复位 2 次无效，生成工单转厂商售后（大疆/科比特服务热线）。
+    require_photo: false
+  - id: 4
+    title: 厂商处理闭环
+    detail: 记录厂商工单号，恢复后标记完成。
+    require_photo: true

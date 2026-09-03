@@ -1,0 +1,107 @@
+"""
+DJI Dock 采集器：通过大疆开放 API（HTTP / WebSocket）拉取机巢与无人机状态，
+归一化为 adapter-kit 可消费的 raw dict，再由边缘侧转换后发布 MQTT。
+"""
+import time
+import requests
+from typing import Optional
+
+
+class DJIDockCollector:
+    def __init__(self, dock_sn: str, api_base: str, app_key: str, app_secret: str):
+        self.dock_sn = dock_sn
+        self.api_base = api_base.rstrip('/')
+        self.app_key = app_key
+        self.app_secret = app_secret
+        self._token: Optional[str] = None
+        self._token_expire = 0
+
+    # —— 鉴权（示意，实际按大疆开放平台文档）——
+    def _get_token(self) -> str:
+        if self._token and time.time() < self._token_expire - 60:
+            return self._token
+        resp = requests.post(f"{self.api_base}/oauth/token", json={
+            "app_key": self.app_key, "app_secret": self.app_secret,
+        }, timeout=5)
+        resp.raise_for_status()
+        data = resp.json()
+        self._token = data["access_token"]
+        self._token_expire = time.time() + data.get("expires_in", 7200)
+        return self._token
+
+    def _request(self, path: str) -> dict:
+        headers = {"Authorization": f"Bearer {self._get_token()}"}
+        resp = requests.get(f"{self.api_base}{path}", headers=headers, timeout=5)
+        resp.raise_for_status()
+        return resp.json()
+
+    def collect(self) -> dict:
+        """归一化为 adapter-kit dji-dock 输入的 raw 结构"""
+        dock = self._request(f"/v1/docks/{self.dock_sn}/state")
+        uav = None
+        try:
+            uav = self._request(f"/v1/docks/{self.dock_sn}/uav")
+        except Exception:
+            pass  # 机巢内无无人机时忽略
+
+        return {
+            "sn": self.dock_sn,
+            "product_version": dock.get("product_version"),
+            "dock_state": dock.get("state"),
+            "charger_temperature_c": dock.get("charger", {}).get("temperature_c", 0),
+            "charger_voltage_v": dock.get("charger", {}).get("voltage_v", 0),
+            "charger_current_a": dock.get("charger", {}).get("current_a", 0),
+            "door_state": dock.get("door", {}).get("state", "closed"),
+            "door_jammed": dock.get("door", {}).get("jammed", False),
+            "lift_platform_state": dock.get("lift", {}).get("state", "down"),
+            "wind_speed": dock.get("weather", {}).get("wind_speed_mps", 0),
+            "wind_gust": dock.get("weather", {}).get("wind_gust_mps", 0),
+            "rainfall": dock.get("weather", {}).get("rainfall_mm", 0),
+            "temperature": dock.get("weather", {}).get("temperature_c", 0),
+            "humidity": dock.get("weather", {}).get("humidity_pct", 0),
+            "uav_inside": dock.get("uav_inside", False),
+            "uav": uav and {
+                "battery_percent": uav.get("battery", {}).get("percent", 0),
+                "battery_cycles": uav.get("battery", {}).get("cycles", 0),
+                "signal_rssi": uav.get("link", {}).get("rssi", -90),
+                "gps_satellites": uav.get("gps", {}).get("satellites", 0),
+                "motor_temperatures": uav.get("motors", []),
+                "propeller_rpms": uav.get("propellers", []),
+                "last_flight_id": uav.get("last_flight_id"),
+            } or None,
+        }
+
+
+def mock_collect() -> dict:
+    """本地 mock 数据（不连真机），用于单元测试与离线验证"""
+    return {
+        "sn": "SN_MOCK_DOCK_001",
+        "product_version": "Dock 2",
+        "dock_state": "charging",
+        "charger_temperature_c": 45,
+        "charger_voltage_v": 24.2,
+        "charger_current_a": 3.1,
+        "door_state": "closed",
+        "door_jammed": False,
+        "lift_platform_state": "down",
+        "wind_speed": 3.2,
+        "wind_gust": 5.1,
+        "rainfall": 0.0,
+        "temperature": 28,
+        "humidity": 65,
+        "uav_inside": True,
+        "uav": {
+            "battery_percent": 78,
+            "battery_cycles": 132,
+            "signal_rssi": -62,
+            "gps_satellites": 12,
+            "motor_temperatures": [42, 41, 43, 40],
+            "propeller_rpms": [7200, 7180, 7220, 7190],
+            "last_flight_id": "FLIGHT_20260902_001",
+        },
+    }
+
+
+if __name__ == "__main__":
+    import json
+    print(json.dumps(mock_collect(), indent=2, ensure_ascii=False))
