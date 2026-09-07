@@ -4,14 +4,13 @@ import { useRobotStore } from '../stores/robotStore'
 import { useAlertStore } from '../stores/alertStore'
 import { sendCommand } from '../lib/wsHub'
 import { AlertItem } from 'ui-kit'
-import { RobotViewer, FanucArm, KukaArm } from 'digital-twin'
+import { RobotViewer } from 'digital-twin'
 import { AIInsightPanel } from '../components/overlays/AIInsightPanel'
 import { HealthGauge } from '../components/HealthGauge'
 import { ExtensionPanel } from '../components/ExtensionPanel'
 import { TrendChart } from '../components/TrendChart'
 import { isIndustrialArm } from '../lib/robotType'
 import { getBrandConfig } from '../lib/brandRegistry'
-import { Canvas } from '@react-three/fiber'
 
 // 工业品牌集合，决定右侧详情面板是否渲染 3D 机械臂模型与关节负载
 const INDUSTRIAL_BRANDS = new Set(['FANUC', 'KUKA', 'ESTUN', 'YASKAWA'])
@@ -303,26 +302,8 @@ export function RobotsPage() {
           </div>
           <div style={{ flex: 1, background: 'var(--bg-base)' }}>
             {selected ? (
-              INDUSTRIAL_BRANDS.has(selected.brand) ? (
-                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Canvas camera={{ position: [3, 2.5, 3.5], fov: 42 }}>
-                    <ambientLight intensity={0.6} />
-                    <directionalLight position={[5, 8, 5]} intensity={1.2} />
-                    <pointLight position={[-3, 2, -2]} intensity={0.4} color="#4a9eff" />
-                    {selected.brand === 'FANUC' && (
-                      <FanucArm joints={selected.industrial?.joints || []} scale={2} />
-                    )}
-                    {(selected.brand === 'KUKA' || selected.brand === 'ESTUN') && (
-                      <KukaArm joints={selected.industrial?.joints || []} scale={2} />
-                    )}
-                    {selected.brand === 'YASKAWA' && (
-                      <FanucArm joints={selected.industrial?.joints || []} scale={2} />
-                    )}
-                  </Canvas>
-                </div>
-              ) : (
-                <RobotViewer robotId={selected.robotId} state={selected} />
-              )
+              // 所有品牌统一走 RobotViewer，内部会根据 brand 自动选 URDF 模型或程序化机械臂
+              <RobotViewer robotId={selected.robotId} state={selected} />
             ) : (
               <div
                 style={{

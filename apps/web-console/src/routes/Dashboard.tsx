@@ -41,6 +41,11 @@ export function Dashboard() {
       { value: 'keenon', label: '擎朗 (keenon)', model: 'Peanut' },
       { value: 'agibot', label: '智元 (agibot)', model: 'A2' },
       { value: 'pudutech', label: '普渡 (pudutech)', model: 'BellaBot' },
+      // 工业机械臂也归在 ground_robot 下，走同一套设备管理
+      { value: 'FANUC', label: '发那科 (FANUC)', model: 'M-20iD' },
+      { value: 'KUKA', label: '库卡 (KUKA)', model: 'KR 10 R1100' },
+      { value: 'ESTUN', label: '埃斯顿 (ESTUN)', model: 'ER6' },
+      { value: 'YASKAWA', label: '安川 (YASKAWA)', model: 'GP7' },
     ],
     uav_dock: [
       { value: 'dji-dock', label: '大疆机巢 (dji-dock)', model: 'Dock 2' },
@@ -134,6 +139,31 @@ export function Dashboard() {
         lighting: 'auto',
         groundPowerVoltageV: 380,
       }
+    }
+
+    // 工业机械臂需要给一套默认关节遥测，不然 3D 模型没法驱动
+    // 6 轴全 0 度（弧度），负载 30%，温度 40度——演示用
+    const industrialBrands = ['FANUC', 'KUKA', 'ESTUN', 'YASKAWA']
+    if (industrialBrands.includes(newBrand)) {
+      state.industrial = {
+        joints: [1, 2, 3, 4, 5, 6].map((j) => ({
+          j,
+          angle_rad: 0,
+          load_pct: 30,
+          temp_c: 40,
+          current_a: 2,
+          speed_rpm: 0,
+        })),
+        alarms: [],
+        runtime: {
+          power_on_hours: 120,
+          operating_hours: 80,
+          cycle_count: 1500,
+        },
+        protocol: newBrand === 'FANUC' ? 'FOCAS' : newBrand === 'KUKA' ? 'ETHERNET_KRL' : 'MODBUS_TCP',
+      }
+      // 工业臂默认状态设为 working，更直观
+      state.status = 'working'
     }
 
     addRobot(state)
