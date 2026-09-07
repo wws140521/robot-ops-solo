@@ -40,11 +40,26 @@
 ### digital-twin · 3D 数字孪生渲染
 
 #### 机器人 3D 模型
-- ✅ 宇树 G1 人形模型 · [G1Dog.tsx](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/digital-twin/src/robots/G1Dog.tsx) · 关节动画
+- ✅ 宇树 G1 人形真实模型 · [G1Humanoid.tsx](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/digital-twin/src/robots/G1Humanoid.tsx) · URDF+STL 加载 + 程序化步态 + 模块级永久 anchor 防 R3F 重挂载 wireframe
+- ✅ 宇树 G1 几何简化模型 · [G1Dog.tsx](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/digital-twin/src/robots/G1Dog.tsx) · 降级用
 - ✅ 普渡花生机器人模型 · [PeanutBot.tsx](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/digital-twin/src/robots/PeanutBot.tsx) · 差速驱动
-- ✅ FANUC 6 轴机械臂模型 · [FanucArm.tsx](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/digital-twin/src/robots/FanucArm.tsx) · 基座 + 6 关节 + 法兰 + 夹爪
-- ✅ KUKA 6 轴机械臂模型 · [KukaArm.tsx](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/digital-twin/src/robots/KukaArm.tsx) · 橙色涂装 + 关节联动
+- ✅ 工业机械臂 URDF 模型 · [IndustrialRobotModel.tsx](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/digital-twin/src/robots/IndustrialRobotModel.tsx) · 4 品牌高细节 STL + useFrame 关节插值
+- ✅ FANUC 6 轴机械臂模型 · [FanucArm.tsx](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/digital-twin/src/robots/FanucArm.tsx) · 基座 + 6 关节 + 法兰 + 夹爪（降级几何版）
+- ✅ KUKA 6 轴机械臂模型 · [KukaArm.tsx](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/digital-twin/src/robots/KukaArm.tsx) · 橙色涂装 + 关节联动（降级几何版）
 - ✅ 模型注册表 · [robots/index.ts](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/digital-twin/src/robots/index.ts) · renderRobotModel(brand) 按品牌分发
+
+#### G1 步态引擎（物理一致性）
+- ✅ 步态数学库 · [gaitMath.ts](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/digital-twin/src/robots/gaitMath.ts) · 步频/步幅角/航向跟踪/朝向映射/tick 插值纯函数（零依赖可单测）
+- ✅ 步距一致（防太空步） · 步频 = 速度÷(2×步长)；步幅角 = asin(步长/2/腿长) → 视觉迈步距离 = 物理移动距离
+- ✅ 朝向对齐（防螃蟹步） · Ry(-θ) 映射 URDF 局部 +X 前向到移动方向（走路/舞蹈双模式）
+- ✅ 转向平滑（防抽搐） · τ=0.18s 连续航向跟踪 + 速度向量 EMA 滤噪 + 实测 tick 间隔插值
+- ✅ 步态单元测试 · [gaitMath.test.ts](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/digital-twin/src/robots/__tests__/gaitMath.test.ts) · 33 例（含旧 bug 回归防线）
+
+#### 工业机器人实时同步（交付形态）
+- ✅ URDF 关节负载颜色映射 · [IndustrialRobotModel.tsx](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/digital-twin/src/robots/IndustrialRobotModel.tsx) · >100% 红 / >80% 黄（叠加自发光）/ 正常恢复品牌原色 · 材质按 mesh 克隆隔离（避免共享材质染红整臂）
+- ✅ 断连冻结 · 遥测停止 → τ=0.25s 插值收敛至最后目标位形后静止，模型不回退 wireframe；15s 无消息标离线
+- ✅ 恢复续动 · WS 重连后从冻结位形平滑恢复运动，无跳变
+- ✅ 2Hz 低频快照 + 插值 · 适配 FOCAS/OPC UA 轮询上限的交付节奏（只读监控红线不变）
 
 #### 场景组件
 - ✅ 地面网格 · Floor.tsx · SLAM 坐标系可视化 · CSS 变量桥接
@@ -141,6 +156,23 @@
 - ✅ 根 scripts · dev/build/test/lint/mock/dev:industrial/test:adapter-kit/build:all
 
 ## 变更日志
+
+### 2026-09-07 · 工业机器人实时同步交付（负载颜色映射 + 断连冻结）
+
+- ✅ IndustrialRobotModel 新增关节负载颜色映射：>100% 红(#ff3d71) / >80% 黄(#ffcc00) 叠加自发光 / 正常恢复品牌原色；上色对象为关节 child link，材质按 mesh 克隆隔离（URDF 共享材质防染红整臂）
+- ✅ 断连冻结策略验证通过：遥测停止 → τ=0.25s 插值收敛至最后目标位形后静止（35s 无漂移），模型不回退 wireframe，状态标「故障」；WS 重连后从冻结位形平滑续动
+- ✅ mock FANUC 负载演示数据调整：J1 85%（黄档）/ J2 118%（红档），交付演示三档颜色齐备
+- ✅ dev 调试句柄 `window.__industrialRobots`（仅开发环境）用于浏览器内核层级/材质验证
+- ✅ 验证：FANUC 逐关节直接 mesh 颜色精确匹配预期；112 例单测全部通过（47+33+32）；tsc 0 错误
+
+### 2026-09-07 · G1 步态三重修复 + 步态数学库抽取 + 单元测试
+
+- ✅ 修复螃蟹步：朝向公式由 `-θ-π/2` 改为 `Ry(-θ)`（G1 URDF 前向为局部 +X，旧公式恒侧移 90°），走路/舞蹈双模式同步修正，髋轴朝向与移动方向实测偏差 73.8° → 0.0°
+- ✅ 修复太空步：步频公式改为 `速度÷(2×步长)`（一个步态周期左右各迈一步）；步幅角按 `asin(步长/2/腿长)` 物理推导，视觉迈步距离 = 物理移动距离，脚不再打滑
+- ✅ 修复转向抽搐：移除转向位置冻结状态机（退出转向瞬移 0.5m+），改为 τ=0.18s 连续航向跟踪 + 速度向量 EMA（滤 mock 位置舍入 ±8° 噪声）+ 实测 tick 间隔插值
+- ✅ 抽取 [gaitMath.ts](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/digital-twin/src/robots/gaitMath.ts) 纯函数库（12 个零依赖函数），G1Humanoid useFrame 内联公式重构为函数调用
+- ✅ digital-twin 新增 vitest 测试基础设施 + [gaitMath.test.ts](file:///Users/wangwenshuai/Desktop/robot-ops-solo/robot-ops-solo/packages/digital-twin/src/robots/__tests__/gaitMath.test.ts) 33 例（含旧公式步频翻倍 / 螃蟹步 90° 偏差 / 转向单帧跳变等回归防线）
+- ✅ 验证：全 workspace 129 例测试通过、tsc 0 错误、浏览器实测速度零尖峰 + 步距一致性误差 7.4%
 
 ### 2026-08-28 · 埋点日志节流 + WS 孤儿连接修复 + Mock 状态推进解耦
 

@@ -5,8 +5,6 @@ import { useSpeakStore, type SpeakEvent } from '../stores/speakStore'
 import { useOtaStore } from '../stores/otaStore'
 import { writeRobotState } from './robotStorage'
 import { writeAlert } from './alertStorage'
-// 2026-08-18 工业品牌集合
-const INDUSTRIAL_BRANDS = new Set(['fanuc', 'kuka', 'estun', 'yaskawa'])
 // 2026-08-28 商用适配完成日志节流签名（robotId → 电量整数位:状态）
 const lastAdaptedSig: Record<string, string> = {}
 // wsHub 初始化入口
@@ -30,11 +28,17 @@ connectMqtt(
 );
 
 // 处理工业遥测消息，industrial_state 写状态，industrial_alert 只写告警
+// 工业流现在是 8 帧/s 的运动仿真，每帧都打日志会刷爆 console，
+// 用「robotId:状态:告警数」签名节流，变化了才打
+const lastIndustrialSig: Record<string, string> = {}
 function handleIndustrialMessage(msg: any) {
   try {
-    console.log('[wsHub] handleIndustrialMessage:', { type: msg.type, brand: msg.brand, payloadKeys: Object.keys(msg.payload ?? {}) })
     const { state, alerts } = adaptByBrandEnhanced(msg.brand, msg.payload)
-    console.log('[wsHub] adaptByBrandEnhanced 完成:', { robotId: state.robotId, status: state.status, battery: state.batteryPct, alertCount: alerts.length })
+    const sig = `${state.robotId}:${state.status}:${alerts.length}`
+    if (lastIndustrialSig[state.robotId] !== sig) {
+      lastIndustrialSig[state.robotId] = sig
+      console.log('[wsHub] 工业消息:', { brand: msg.brand, robotId: state.robotId, status: state.status, alertCount: alerts.length })
+    }
     if (msg.type === 'industrial_state') {
       useRobotStore.getState().updateRobot(state.robotId, state)
       writeRobotState(state, msg.payload)
@@ -146,7 +150,6 @@ export function startWS(connections: WsConnection[]) {
         try {
           // 2026-08-19 工业消息分流（type: industrial_state / industrial_alert）
           if (raw?.type === 'industrial_state' || raw?.type === 'industrial_alert') {
-            console.log('[wsHub] 工业消息分流:', raw.type, raw.brand)
             handleIndustrialMessage(raw)
             return
           }

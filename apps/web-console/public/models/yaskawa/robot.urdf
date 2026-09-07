@@ -1,171 +1,114 @@
 <?xml version="1.0"?>
-<robot name="yaskawa_gp7">
+<!-- YASKAWA GP7 官方模型：STL 和关节参数来自 ros-industrial/motoman (motoman_gp7_support) -->
+<!-- Z-up 米制，加载时需要 convertToYUp -->
+<robot name="motoman_gp7">
 
-  <material name="yaskawa_blue">
-    <color rgba="0.086 0.365 1.0 1.0"/>
-  </material>
-  <material name="yaskawa_dark">
-    <color rgba="0.1 0.1 0.1 1.0"/>
-  </material>
+  <material name="yaskawa_blue"><color rgba="0.129 0.149 0.749 1.0"/></material>
+  <material name="yaskawa_white"><color rgba="0.99 0.99 0.99 1.0"/></material>
+  <material name="yaskawa_silver"><color rgba="0.8 0.8 0.8 1.0"/></material>
 
-  <!-- base link -->
-  <link name="base">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="18.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="base_link">
     <visual>
-      <origin xyz="0 0 0.1275"/>
-      <geometry>
-        <mesh filename="package://yaskawa_support/meshes/base_link.STL"/>
-      </geometry>
-      <material name="yaskawa_dark"/>
-    </visual>
-  </link>
-
-  <link name="j1">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="9.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
-    <visual>
-      <origin xyz="0 0 -0.075"/>
-      <geometry>
-        <mesh filename="package://yaskawa_support/meshes/j1_link.STL"/>
-      </geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://yaskawa_support/meshes/gp7_base_link.stl"/></geometry>
       <material name="yaskawa_blue"/>
     </visual>
   </link>
 
-  <link name="j2">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="11.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_1_s">
     <visual>
-      <origin xyz="0 0 -0.16"/>
-      <geometry>
-        <mesh filename="package://yaskawa_support/meshes/j2_link.STL"/>
-      </geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://yaskawa_support/meshes/gp7_link_1_s.stl"/></geometry>
       <material name="yaskawa_blue"/>
     </visual>
   </link>
 
-  <link name="j3">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="7.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_2_l">
     <visual>
-      <origin xyz="0 0 -0.12"/>
-      <geometry>
-        <mesh filename="package://yaskawa_support/meshes/j3_link.STL"/>
-      </geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://yaskawa_support/meshes/gp7_link_2_l.stl"/></geometry>
       <material name="yaskawa_blue"/>
     </visual>
   </link>
 
-  <link name="j4">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="3.5"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_3_u">
     <visual>
-      <origin xyz="0 0 -0.055"/>
-      <geometry>
-        <mesh filename="package://yaskawa_support/meshes/j4_link.STL"/>
-      </geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://yaskawa_support/meshes/gp7_link_3_u.stl"/></geometry>
       <material name="yaskawa_blue"/>
     </visual>
   </link>
 
-  <link name="j5">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="1.8"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_4_r">
     <visual>
-      <origin xyz="0 0 -0.045"/>
-      <geometry>
-        <mesh filename="package://yaskawa_support/meshes/j5_link.STL"/>
-      </geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://yaskawa_support/meshes/gp7_link_4_r.stl"/></geometry>
       <material name="yaskawa_blue"/>
     </visual>
   </link>
 
-  <link name="j6">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="0.9"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_5_b">
     <visual>
-      <origin xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="package://yaskawa_support/meshes/j6_link.STL"/>
-      </geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://yaskawa_support/meshes/gp7_link_5_b.stl"/></geometry>
       <material name="yaskawa_blue"/>
     </visual>
   </link>
 
-  <!-- base -> j1 绕Y轴 (S轴) -->
-  <joint name="joint_s" type="revolute">
-    <origin xyz="0 0 0.255" rpy="0 0 0"/>
-    <parent link="base"/>
-    <child link="j1"/>
+  <link name="link_6_t">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://yaskawa_support/meshes/gp7_link_6_t.stl"/></geometry>
+      <material name="yaskawa_silver"/>
+    </visual>
+  </link>
+
+  <joint name="joint_1_s" type="revolute">
+    <origin xyz="0 0 0.330" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="link_1_s"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-2.967060" upper="2.967060" effort="212.66" velocity="6.544985"/>
+  </joint>
+
+  <joint name="joint_2_l" type="revolute">
+    <origin xyz="0.040 0 0" rpy="0 0 0"/>
+    <parent link="link_1_s"/>
+    <child link="link_2_l"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-2.967059728" upper="2.967059728" effort="100" velocity="3.14"/>
+    <limit lower="-1.134464" upper="2.530727" effort="205.80" velocity="5.497787"/>
   </joint>
 
-  <!-- j1 -> j2 绕X轴 (L轴) -->
-  <joint name="joint_l" type="revolute">
-    <origin xyz="0 0 -0.15" rpy="0 0 0"/>
-    <parent link="j1"/>
-    <child link="j2"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-1.570796327" upper="2.617993878" effort="100" velocity="2.094"/>
+  <joint name="joint_3_u" type="revolute">
+    <origin xyz="0 0 0.445" rpy="0 0 0"/>
+    <parent link="link_2_l"/>
+    <child link="link_3_u"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-1.221730" upper="3.316126" effort="106.82" velocity="7.155850"/>
   </joint>
 
-  <!-- j2 -> j3 绕X轴 (U轴) -->
-  <joint name="joint_u" type="revolute">
-    <origin xyz="0 0 -0.32" rpy="0 0 0"/>
-    <parent link="j2"/>
-    <child link="j3"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-2.617993878" upper="1.570796327" effort="100" velocity="2.094"/>
+  <joint name="joint_4_r" type="revolute">
+    <origin xyz="0.440 0 0.040" rpy="0 0 0"/>
+    <parent link="link_3_u"/>
+    <child link="link_4_r"/>
+    <axis xyz="-1 0 0"/>
+    <limit lower="-4.712389" upper="4.712389" effort="60.35" velocity="8.726646"/>
   </joint>
 
-  <!-- j3 -> j4 绕X轴 (R轴) -->
-  <joint name="joint_r" type="revolute">
-    <origin xyz="0 0 -0.24" rpy="0 0 0"/>
-    <parent link="j3"/>
-    <child link="j4"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-3.839724354" upper="3.839724354" effort="50" velocity="4.189"/>
+  <joint name="joint_5_b" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="link_4_r"/>
+    <child link="link_5_b"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-2.443461" upper="2.443461" effort="37.13" velocity="8.726646"/>
   </joint>
 
-  <!-- j4 -> j5 绕Y轴 (B轴) -->
-  <joint name="joint_b" type="revolute">
-    <origin xyz="0 0 -0.11" rpy="0 0 0"/>
-    <parent link="j4"/>
-    <child link="j5"/>
-    <axis xyz="0 1 0"/>
-    <limit lower="-2.443460953" upper="2.443460953" effort="50" velocity="3.141"/>
-  </joint>
-
-  <!-- j5 -> j6 绕X轴 (T轴/末端) -->
-  <joint name="joint_t" type="revolute">
-    <origin xyz="0 0 -0.09" rpy="0 0 0"/>
-    <parent link="j5"/>
-    <child link="j6"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-6.283185307" upper="6.283185307" effort="30" velocity="6.283"/>
+  <joint name="joint_6_t" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="link_5_b"/>
+    <child link="link_6_t"/>
+    <axis xyz="-1 0 0"/>
+    <limit lower="-6.283185" upper="6.283185" effort="18.46" velocity="13.962634"/>
   </joint>
 
 </robot>

@@ -1,171 +1,114 @@
 <?xml version="1.0"?>
-<robot name="estun_er6">
+<!-- ESTUN iER7-910-MI 官方模型：STL 由 ESTUN-R-D/estun_description 的 DAE 转换并减面而来 -->
+<!-- 关节参数来自 iER7-910-MI-macro.xacro + default_kinematics.yaml（L1=391 L2=40 L3=430 L4=40 L5=445 L6=80） -->
+<!-- Z-up 米制，加载时需要 convertToYUp -->
+<robot name="estun_ier7_910_mi">
 
-  <material name="estun_yellow">
-    <color rgba="1.0 0.82 0.0 1.0"/>
-  </material>
-  <material name="estun_dark">
-    <color rgba="0.1 0.1 0.1 1.0"/>
-  </material>
+  <material name="estun_white"><color rgba="0.92 0.92 0.94 1.0"/></material>
+  <material name="estun_gray"><color rgba="0.55 0.57 0.60 1.0"/></material>
 
-  <!-- base link -->
-  <link name="base">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="15.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="base_link">
     <visual>
-      <origin xyz="0 0 0.1225"/>
-      <geometry>
-        <mesh filename="package://estun_support/meshes/base_link.STL"/>
-      </geometry>
-      <material name="estun_dark"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://estun_support/meshes/base_link.stl"/></geometry>
+      <material name="estun_white"/>
     </visual>
   </link>
 
-  <link name="j1">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="8.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_1">
     <visual>
-      <origin xyz="0 0 -0.07"/>
-      <geometry>
-        <mesh filename="package://estun_support/meshes/j1_link.STL"/>
-      </geometry>
-      <material name="estun_yellow"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://estun_support/meshes/link1.stl"/></geometry>
+      <material name="estun_white"/>
     </visual>
   </link>
 
-  <link name="j2">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="10.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_2">
     <visual>
-      <origin xyz="0 0 -0.14"/>
-      <geometry>
-        <mesh filename="package://estun_support/meshes/j2_link.STL"/>
-      </geometry>
-      <material name="estun_yellow"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://estun_support/meshes/link2.stl"/></geometry>
+      <material name="estun_white"/>
     </visual>
   </link>
 
-  <link name="j3">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="6.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_3">
     <visual>
-      <origin xyz="0 0 -0.10"/>
-      <geometry>
-        <mesh filename="package://estun_support/meshes/j3_link.STL"/>
-      </geometry>
-      <material name="estun_yellow"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://estun_support/meshes/link3.stl"/></geometry>
+      <material name="estun_gray"/>
     </visual>
   </link>
 
-  <link name="j4">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="3.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_4">
     <visual>
-      <origin xyz="0 0 -0.045"/>
-      <geometry>
-        <mesh filename="package://estun_support/meshes/j4_link.STL"/>
-      </geometry>
-      <material name="estun_yellow"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://estun_support/meshes/link4.stl"/></geometry>
+      <material name="estun_white"/>
     </visual>
   </link>
 
-  <link name="j5">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="1.5"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_5">
     <visual>
-      <origin xyz="0 0 -0.04"/>
-      <geometry>
-        <mesh filename="package://estun_support/meshes/j5_link.STL"/>
-      </geometry>
-      <material name="estun_yellow"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://estun_support/meshes/link5.stl"/></geometry>
+      <material name="estun_gray"/>
     </visual>
   </link>
 
-  <link name="j6">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="0.7"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_6">
     <visual>
-      <origin xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="package://estun_support/meshes/j6_link.STL"/>
-      </geometry>
-      <material name="estun_yellow"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://estun_support/meshes/link6.stl"/></geometry>
+      <material name="estun_gray"/>
     </visual>
   </link>
 
-  <!-- base -> j1 绕Y轴 -->
   <joint name="joint_1" type="revolute">
-    <origin xyz="0 0 0.245" rpy="0 0 0"/>
-    <parent link="base"/>
-    <child link="j1"/>
-    <axis xyz="0 1 0"/>
-    <limit lower="-2.967059728" upper="2.967059728" effort="100" velocity="3.14"/>
+    <origin xyz="0 0 0.391" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="link_1"/>
+    <axis xyz="0 0 -1"/>
+    <limit lower="-2.967060" upper="2.967060" effort="500" velocity="5.846853"/>
   </joint>
 
-  <!-- j1 -> j2 绕X轴 -->
   <joint name="joint_2" type="revolute">
-    <origin xyz="0 0 -0.14" rpy="0 0 0"/>
-    <parent link="j1"/>
-    <child link="j2"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-1.570796327" upper="2.617993878" effort="100" velocity="2.094"/>
-  </joint>
-
-  <!-- j2 -> j3 绕X轴 -->
-  <joint name="joint_3" type="revolute">
-    <origin xyz="0 0 -0.28" rpy="0 0 0"/>
-    <parent link="j2"/>
-    <child link="j3"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-2.617993878" upper="1.570796327" effort="100" velocity="2.094"/>
-  </joint>
-
-  <!-- j3 -> j4 绕X轴 -->
-  <joint name="joint_4" type="revolute">
-    <origin xyz="0 0 -0.20" rpy="0 0 0"/>
-    <parent link="j3"/>
-    <child link="j4"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-3.839724354" upper="3.839724354" effort="50" velocity="4.189"/>
-  </joint>
-
-  <!-- j4 -> j5 绕Y轴 -->
-  <joint name="joint_5" type="revolute">
-    <origin xyz="0 0 -0.09" rpy="0 0 0"/>
-    <parent link="j4"/>
-    <child link="j5"/>
+    <origin xyz="0.040 0 0" rpy="0 0 0"/>
+    <parent link="link_1"/>
+    <child link="link_2"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-2.443460953" upper="2.443460953" effort="50" velocity="3.141"/>
+    <limit lower="-1.396263" upper="2.356194" effort="450" velocity="5.759587"/>
   </joint>
 
-  <!-- j5 -> j6 绕X轴 -->
+  <joint name="joint_3" type="revolute">
+    <origin xyz="0 0 0.430" rpy="0 0 0"/>
+    <parent link="link_2"/>
+    <child link="link_3"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.316126" upper="1.134464" effort="200" velocity="7.068583"/>
+  </joint>
+
+  <joint name="joint_4" type="revolute">
+    <origin xyz="0 0 0.040" rpy="0 1.570796327 0"/>
+    <parent link="link_3"/>
+    <child link="link_4"/>
+    <axis xyz="0 0 -1"/>
+    <limit lower="-3.316126" upper="3.316126" effort="50" velocity="8.726646"/>
+  </joint>
+
+  <joint name="joint_5" type="revolute">
+    <origin xyz="0 0 0.445" rpy="0 0 0"/>
+    <parent link="link_4"/>
+    <child link="link_5"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.094395" upper="2.094395" effort="50" velocity="7.853982"/>
+  </joint>
+
   <joint name="joint_6" type="revolute">
-    <origin xyz="0 0 -0.08" rpy="0 0 0"/>
-    <parent link="j5"/>
-    <child link="j6"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-6.283185307" upper="6.283185307" effort="30" velocity="6.283"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="link_5"/>
+    <child link="link_6"/>
+    <axis xyz="0 0 -1"/>
+    <limit lower="-6.283185" upper="6.283185" effort="50" velocity="12.304571"/>
   </joint>
 
 </robot>

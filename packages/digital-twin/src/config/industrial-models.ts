@@ -26,10 +26,10 @@ export interface IndustrialModelConfig {
 export const INDUSTRIAL_MODELS: Record<IndustrialBrand, IndustrialModelConfig> = {
   FANUC: {
     brand: 'FANUC',
-    displayName: 'FANUC M-20iD',
+    displayName: 'FANUC M-20iA',
     urdfPath: '/models/fanuc/robot.urdf',
     packageMap: { fanuc_support: '/models/fanuc' },
-    // 典型 6 轴映射，实际按 URDF 调整
+    // 官方 M-20iA URDF 关节名，索引从 1 开始对应 JointTelemetry.j
     jointMap: {
       1: 'joint_1',
       2: 'joint_2',
@@ -38,28 +38,31 @@ export const INDUSTRIAL_MODELS: Record<IndustrialBrand, IndustrialModelConfig> =
       5: 'joint_5',
       6: 'joint_6',
     },
-    scale: 1.0,
+    // 真实尺寸约 2m+，稍微压一点让它在场景里和 G1 协调
+    scale: 0.85,
     liftY: 0,
   },
   KUKA: {
     brand: 'KUKA',
-    displayName: 'KUKA KR 10 R1100',
+    displayName: 'KUKA KR 6 R900 sixx',
     urdfPath: '/models/kuka/robot.urdf',
     packageMap: { kuka_kr10_support: '/models/kuka' },
+    // KUKA 官方命名是 joint_a1..joint_a6，别和 FANUC 的搞混
     jointMap: {
-      1: 'joint_1',
-      2: 'joint_2',
-      3: 'joint_3',
-      4: 'joint_4',
-      5: 'joint_5',
-      6: 'joint_6',
+      1: 'joint_a1',
+      2: 'joint_a2',
+      3: 'joint_a3',
+      4: 'joint_a4',
+      5: 'joint_a5',
+      6: 'joint_a6',
     },
-    scale: 1.0,
+    // KR6 是小个子（站高不到 1m），放大一点保持视觉均衡
+    scale: 1.3,
     liftY: 0,
   },
   ESTUN: {
     brand: 'ESTUN',
-    displayName: 'ESTUN ER6',
+    displayName: 'ESTUN iER7-910',
     urdfPath: '/models/estun/robot.urdf',
     packageMap: { estun_support: '/models/estun' },
     jointMap: {
@@ -78,13 +81,14 @@ export const INDUSTRIAL_MODELS: Record<IndustrialBrand, IndustrialModelConfig> =
     displayName: 'YASKAWA GP7',
     urdfPath: '/models/yaskawa/robot.urdf',
     packageMap: { yaskawa_support: '/models/yaskawa' },
+    // 安川官方命名带轴后缀：s/l/u/r/b/t 分别对应 S/L/U/R/B/T 轴
     jointMap: {
-      1: 'joint_s',
-      2: 'joint_l',
-      3: 'joint_u',
-      4: 'joint_r',
-      5: 'joint_b',
-      6: 'joint_t',
+      1: 'joint_1_s',
+      2: 'joint_2_l',
+      3: 'joint_3_u',
+      4: 'joint_4_r',
+      5: 'joint_5_b',
+      6: 'joint_6_t',
     },
     scale: 1.0,
     liftY: 0,

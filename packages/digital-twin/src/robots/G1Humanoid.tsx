@@ -18,6 +18,20 @@ import * as THREE from 'three'
 import { parseURDF, loadRobot, type URDFRobot } from 'three-urdf'
 import { useDancePlayer } from '../dance/useDancePlayer'
 import { type G1JointName, type DanceKeyframe } from '../dance/subject3-keyframes'
+import {
+  clamp,
+  wrapAngle,
+  stepFrequency,
+  actualStepLength,
+  legAmplitude,
+  stridePitchAmplitude,
+  trackHeading,
+  thetaToRotY,
+  tickInterpAlpha,
+  measuredTickInterval,
+  emaTickInterval,
+  emaVelocity,
+} from './gaitMath'
 
 // ─── 常量 ────────────────────────────────────────────
 const URDF_PATH = '/models/g1/g1_29dof.urdf'
@@ -49,28 +63,19 @@ let g1RobotAddedToAnchor = false  // 机器人是否已加入 anchor
 // 步态参数（GaitParams）· 参考 robot-ops-solo-ROBOT-LOCOMOTION.md §3.1
 // ═══════════════════════════════════════════════════════════
 interface GaitParams {
-  stepLength: number        // 步长 m
+  stepLength: number        // 单步步长 m（一个相位周期迈两步，走 2×stepLength）
   armSwing: number          // 摆臂振幅 rad，0.7 ≈ 40°
   speedBlend: number        // 频率平滑系数 dt*speedBlend
 }
 
 const DEFAULT_GAIT: GaitParams = {
-  stepLength: 0.45,    // G1 舒适步幅，0.3m/s / 0.45m ≈ 0.67Hz
+  stepLength: 0.45,    // G1 舒适步幅；0.5 m/s ÷ (2×0.45) ≈ 0.56 Hz 步频
   armSwing: 0.7,
   speedBlend: 15.0,    // 1/60*15=0.25/帧 → 5帧到76%，快速响应速度变化
 }
 
-// ─── 通用数学工具 ──────────────────────────────────
-function clamp(v: number, min: number, max: number) {
-  if (!isFinite(v)) return min
-  return Math.max(min, Math.min(max, v))
-}
-// 角度差归一化到 (-π, π]，用于转向选最短方向
-function wrapAngle(a: number) {
-  while (a > Math.PI) a -= Math.PI * 2
-  while (a < -Math.PI) a += Math.PI * 2
-  return a
-}
+// 髋关节到脚底的大致腿长，算步幅摆角用
+const LEG_LEN = 0.78
 
 // ─── 导出接口（保持向后兼容） ──────────────────────────
 export interface G1HumanoidProps {
@@ -229,7 +234,7 @@ function G1Model({ position, rotation, scale, onLoaded, onError }: G1ModelProps)
   // ─── 步态状态 refs（纯程序化，不触发 re-render） ──────────
   const initTheta = isFinite(rotation[1]) ? rotation[1] : 0
   const gaitRef = useRef({
-    phase: 0,           // 0 → 2π，走路相位
+    phase: 0,           // 0 → 2π，走路相位（一个周期 = 左右各一步 = 2 步）
     smoothedPos: [position[0], position[1], position[2]] as [number, number, number],
     smoothedTheta: initTheta,
     prevTheta: initTheta,
@@ -237,16 +242,17 @@ function G1Model({ position, rotation, scale, onLoaded, onError }: G1ModelProps)
     prevWsPos: [position[0], position[2]] as [number, number],  // 上一 tick 的 WS 位置
     lastWsPos: [position[0], position[2]] as [number, number],  // 最新 tick 的 WS 位置
     tickAge: 0,          // 距上一 tick 的经过时间 (s)，用于线性插值
+    tickIntervalEma: 0.1, // 实测 tick 间隔（EMA），不再硬编码 0.1s
+    velEmaX: 0,          // EMA 速度向量 X 分量 (m/s)
+    velEmaZ: 0,          // EMA 速度向量 Z 分量 (m/s)
     yawVel: 0,          // 角速度 (rad/s)
     idleBlend: 1,       // 1 = 完全 idle, 0 = 完全 walk
-    currentFreq: 1.0,   // 动态步频（speed/stepLength + lerp 平滑）
+    currentFreq: 1.0,   // 动态步频（周期/秒），lerp 平滑
     turnAmount: 0,      // 当前帧转向量 rad，用于转向 anticipation
-    emaFrameVel: 0,     // 帧间速度 EMA（τ=0.05s），从 lerp 后的 smoothedPos 帧间差分计算
-    // 转向状态机
+    emaFrameVel: 0,     // 平滑后的行走速度 (m/s)，bob/摆幅用
+    // 转向状态机：只驱动腿部交叉步样式，不再冻结位置/锁存航向
+    // （mock 是边走边转的弧线运动，冻结后退出瞬移 0.5m+，肉眼就是抽搐）
     turnState: 'walking' as 'walking' | 'turning',
-    turnPos: [position[0], position[2]] as [number, number],  // 转向时冻结的位置
-    turnTargetHeading: 0,  // 转向目标航向，在进入 turning 时锁存（已 wrapAngle 归一化）
-    wsTickVel: 0,          // WS tick 速度（稳定速度源）
   })
 
   // 保持最新的 position / rotation 引用供 useFrame 访问
@@ -296,8 +302,12 @@ function G1Model({ position, rotation, scale, onLoaded, onError }: G1ModelProps)
       g1AnchorInScene = true
       console.log('[G1Model] 永久 anchor 已加入 R3F scene')
     }
+    // 挂载时确保可见（可能刚从别的设备切回来）
+    g1Anchor.visible = true
     return () => {
       // 故意不 remove：anchor 永不离开 scene，防止 three-urdf mesh 状态丢失
+      // 但卸载时必须藏起来，不然切换到其他设备时 G1 还杵在场景里
+      g1Anchor.visible = false
     }
   }, [scene])
 
@@ -520,8 +530,8 @@ function G1Model({ position, rotation, scale, onLoaded, onError }: G1ModelProps)
         g.smoothedPos[1],
         do_[2] + (dr?.position?.[2] ?? 0),
       )
-      // mock 约定 (0=+X) → three.js rotation.y (-θ-π/2)
-      g1Anchor.rotation.set(0, -g.smoothedTheta - Math.PI / 2 + (dr?.rotationY ?? 0), 0)
+      // G1 URDF 前向 = 局部 +X → rotation.y = -θ（实测脚踝连线标定，非 -θ-π/2）
+      g1Anchor.rotation.set(0, thetaToRotY(g.smoothedTheta) + (dr?.rotationY ?? 0), 0)
       g1Anchor.scale.set(scaleRef.current, scaleRef.current, scaleRef.current)
       return  // 跳过 gait
     }
@@ -530,7 +540,6 @@ function G1Model({ position, rotation, scale, onLoaded, onError }: G1ModelProps)
     const dt = Math.min(delta, 0.05) // clamp 防止 tab 切回来后 dt 爆炸
     const PARAMS = DEFAULT_GAIT
 
-    // ═══ 1. 导航：位置 + 航向同步 ═══
     const targetX = p[0], targetY = p[1], targetZ = p[2]
     const sx = targetX
     const sz = targetZ
@@ -539,146 +548,90 @@ function G1Model({ position, rotation, scale, onLoaded, onError }: G1ModelProps)
     const posAlpha = 1 - Math.exp(-dt / 0.25)
     g.smoothedPos[1] += (targetY - g.smoothedPos[1]) * posAlpha
 
-    // 1c. 计算期望朝向（mock 服务器约定: 0=+X(东), π/2=+Z(北)）
-    // 用 WS tick 帧间增量算运动方向，不依赖插值位置
-    // wsDx = deltaX, wsDz = deltaZ（mock 服务器的 Y 映射到 three.js 的 Z）
-    const wsDx = g.lastWsPos[0] - g.prevWsPos[0]
-    const wsDz = g.lastWsPos[1] - g.prevWsPos[1]
-    const wsDist = Math.sqrt(wsDx * wsDx + wsDz * wsDz)
-    const freshHeading = wsDist > 0.001
-      ? Math.atan2(wsDz, wsDx)
-      : g.smoothedTheta
-    const TURN_THRESHOLD = 0.3    // 17° → 触发转向
-    const ALIGN_THRESHOLD = 0.15  // 8.6° → 对齐完成
+    // ═══ 1. 位置 dead reckoning（实测 tick 间隔 + 速度向量 EMA）═══
+    // mock 位置四舍五入到 0.01m，逐 tick 差分算航向会 ±8° 振荡；
+    // 把每 tick 位移 EMA 成速度向量，航向/速度都从它取，噪声自然被滤掉
+    const wsChanged = Math.abs(sx - g.lastWsPos[0]) > 0.0001 || Math.abs(sz - g.lastWsPos[1]) > 0.0001
+    if (wsChanged) {
+      // 本次 tick 的实测间隔（tickAge + dt 是从上一 tick 到本帧的真实耗时）
+      const measured = measuredTickInterval(g.tickAge, dt)
+      g.tickIntervalEma = emaTickInterval(g.tickIntervalEma, measured)
+      const dx = sx - g.lastWsPos[0]
+      const dz = sz - g.lastWsPos[1]
+      g.velEmaX = emaVelocity(g.velEmaX, dx, measured)
+      g.velEmaZ = emaVelocity(g.velEmaZ, dz, measured)
+      g.prevWsPos[0] = g.lastWsPos[0]
+      g.prevWsPos[1] = g.lastWsPos[1]
+      g.lastWsPos[0] = sx
+      g.lastWsPos[1] = sz
+      g.tickAge = 0
+    }
+    // 长时间没有新 tick（机器人停了）→ 速度向零衰减
+    if (g.tickAge > 0.4) {
+      const decay = Math.exp(-dt / 0.4)
+      g.velEmaX *= decay
+      g.velEmaZ *= decay
+    }
+    // 帧间线性插值：用实测间隔而不是硬编码 0.1s，网络抖动也不出锯齿
+    const interpAlpha = tickInterpAlpha(g.tickAge, dt, g.tickIntervalEma)
+    g.smoothedPos[0] = g.prevWsPos[0] + (g.lastWsPos[0] - g.prevWsPos[0]) * interpAlpha
+    g.smoothedPos[2] = g.prevWsPos[1] + (g.lastWsPos[1] - g.prevWsPos[1]) * interpAlpha
+    g.tickAge += dt
 
-    // ── 转向状态机：停止 → 转向 → 前进 ──
-    // 不要边走边转（螃蟹步），先停住、转好方向、再往前走
+    // ═══ 2. 航向连续平滑跟踪 + 转向状态机（纯腿部样式）═══
+    const speed = Math.hypot(g.velEmaX, g.velEmaZ)
+    // mock 约定: 0=+X(东), π/2=+Z(北)；mock 的 Y 映射到 three.js 的 Z
+    const freshHeading = speed > 0.05 ? Math.atan2(g.velEmaZ, g.velEmaX) : g.smoothedTheta
     const headingError = wrapAngle(freshHeading - g.smoothedTheta)
 
-    if (g.turnState === 'turning') {
-      // 位置冻结在 turnPos，只旋转
-      g.smoothedPos[0] = g.turnPos[0]
-      g.smoothedPos[2] = g.turnPos[1]
+    // τ=0.18s 连续跟踪：mock 转弯速率 1.5 rad/s 时稳态滞后 0.27 rad，
+    // 视觉上就是自然的弧线转弯，不再有冻结-瞬移
+    g.smoothedTheta = trackHeading(g.smoothedTheta, freshHeading, dt, 0.18)
 
-      // 转向期间仍持续追踪 WS tick 位置，退出 turning 时 prevWsPos/lastWsPos 才是最新的，
-      // 避免恢复行走后出现巨大 delta 导致 emaFrameVel 暴涨。
-      const wsChanged = Math.abs(sx - g.lastWsPos[0]) > 0.0001 || Math.abs(sz - g.lastWsPos[1]) > 0.0001
-      if (wsChanged) {
-        g.prevWsPos[0] = g.lastWsPos[0]
-        g.prevWsPos[1] = g.lastWsPos[1]
-        g.lastWsPos[0] = sx
-        g.lastWsPos[1] = sz
-        g.tickAge = 0
-      }
-
-      // 用锁存的 turnTargetHeading 作为旋转目标，不受 WS 新 tick 影响
-      const turnHeadingError = wrapAngle(g.turnTargetHeading - g.smoothedTheta)
-      // NaN 防护：确保 turnHeadingError 是有效数字
-      if (isFinite(turnHeadingError)) {
-        g.smoothedTheta += turnHeadingError * (1 - Math.exp(-dt / 0.3))
-        // 每帧归一化，防止 smoothedTheta 无限累积（已观察到 900°+）
-        g.smoothedTheta = wrapAngle(g.smoothedTheta)
-      } else {
-        console.warn('[g1] NaN turnHeadingError, aborting turn')
-        g.turnState = 'walking'
-      }
-      // 转向中的实际旋转量 → 用于步态转向 anticipation
-      const headingChange = g.smoothedTheta - g.prevTheta
-      g.yawVel = Math.abs(headingChange) / Math.max(dt, 0.001)
-      g.turnAmount = Math.abs(turnHeadingError)
-      // 对齐完成 → 恢复行走
-      if (Math.abs(turnHeadingError) < ALIGN_THRESHOLD) {
-        g.turnState = 'walking'
-        // 不再重置 prevWsPos/lastWsPos 到 turnPos，否则退出后的第一个 WS tick 会产生巨大 delta，
-        // 导致 emaFrameVel 暴涨、步频突然提高。
-        // 转向期间 wsChanged 仍然会更追踪 WS 位置，因此直接沿用即可。
-        g.tickAge = 0
-      }
-    } else {
-      // WALKING：正常死冲缀位置
-      // 1a. 小幅航向偏差持续修正（τ=0.5s），防止小于 TURN_THRESHOLD 的偏角累积成螃蟹步
-      if (isFinite(headingError) && Math.abs(headingError) <= TURN_THRESHOLD) {
-        g.smoothedTheta += headingError * (1 - Math.exp(-dt / 0.5))
-        // 每帧归一化
-        g.smoothedTheta = wrapAngle(g.smoothedTheta)
-      }
-
-      // 1b. 检测是否需要转向（大角度）
-      // NaN 防护：确保 headingError 和 freshHeading 都是有效数字
-      if (isFinite(headingError) && isFinite(freshHeading) &&
-          Math.abs(headingError) > TURN_THRESHOLD && wsDist > 0.001 && g.wsTickVel > 0.05) {
+    // 转向状态机只决定腿部要不要摆交叉步，位置和航向照常走
+    const TURN_THRESHOLD = 0.3    // 17° → 急转时切交叉步
+    const ALIGN_THRESHOLD = 0.15  // 8.6° → 回到正常步态
+    if (g.turnState === 'walking') {
+      if (Math.abs(headingError) > TURN_THRESHOLD && speed > 0.1) {
         g.turnState = 'turning'
-        g.turnPos[0] = g.smoothedPos[0]
-        g.turnPos[1] = g.smoothedPos[2]
-        // 锁存转向目标航向，整个转向过程使用此值，避免 WS tick 干扰
-        g.turnTargetHeading = wrapAngle(freshHeading)
       }
-
-      // 1c. 位置：WS tick 帧间线性插值（dead reckoning）
-      const wsChanged = Math.abs(sx - g.lastWsPos[0]) > 0.0001 || Math.abs(sz - g.lastWsPos[1]) > 0.0001
-      if (wsChanged) {
-        g.prevWsPos[0] = g.lastWsPos[0]
-        g.prevWsPos[1] = g.lastWsPos[1]
-        g.lastWsPos[0] = sx
-        g.lastWsPos[1] = sz
-        g.tickAge = 0
-        // 用 WS tick 速度作为速度源（稳定 0.5 m/s），避免插值帧间差分波动
-        const wsDx = g.lastWsPos[0] - g.prevWsPos[0]
-        const wsDz = g.lastWsPos[1] - g.prevWsPos[1]
-        const tickDist = Math.hypot(wsDx, wsDz)
-        g.wsTickVel = tickDist / 0.1  // mock tick 间隔 0.1s
-      }
-      const interpAlpha = clamp((g.tickAge + dt) / 0.1, 0, 1)
-      g.smoothedPos[0] = g.prevWsPos[0] + (g.lastWsPos[0] - g.prevWsPos[0]) * interpAlpha
-      g.smoothedPos[2] = g.prevWsPos[1] + (g.lastWsPos[1] - g.prevWsPos[1]) * interpAlpha
-      g.tickAge += dt
-
-      // walking 状态无大转向 anticipation
-      g.yawVel = 0
-      g.turnAmount = 0
+    } else if (Math.abs(headingError) < ALIGN_THRESHOLD) {
+      g.turnState = 'walking'
     }
 
-    // 调试：每 60 帧打印航向值
+    // 转向 anticipation 用：实际旋转角速度 + 当前航向偏差
+    const headingChange = Math.abs(wrapAngle(g.smoothedTheta - g.prevTheta))
+    g.yawVel = headingChange / Math.max(dt, 0.001)
+    g.turnAmount = Math.abs(headingError)
+
+    // 调试：每 60 帧打印一次步态核心量
     const _debugCount = (window as unknown as Record<string, number>).__g1DebugCount ?? 0
     ;(window as unknown as Record<string, number>).__g1DebugCount = _debugCount + 1
     if (_debugCount % 60 === 0) {
-      const anchorRotY = g1Anchor.rotation.y
       console.log(
-        `[g1-debug] freshHeading=${(freshHeading * 180 / Math.PI).toFixed(1)}° ` +
-        `smoothedTheta=${(g.smoothedTheta * 180 / Math.PI).toFixed(1)}° ` +
-        `headingError=${(headingError * 180 / Math.PI).toFixed(1)}° ` +
-        `anchorRotY=${(anchorRotY * 180 / Math.PI).toFixed(1)}° ` +
-        `turnState=${g.turnState} ` +
-        `emaFrameVel=${g.emaFrameVel.toFixed(3)}`
+        `[g1-debug] speed=${speed.toFixed(2)} freq=${g.currentFreq.toFixed(2)} ` +
+        `theta=${(g.smoothedTheta * 180 / Math.PI).toFixed(1)}° err=${(headingError * 180 / Math.PI).toFixed(1)}° ` +
+        `turn=${g.turnState} pos=(${g.smoothedPos[0].toFixed(2)},${g.smoothedPos[2].toFixed(2)})`
       )
     }
 
-    // ═══ 2. 步态相位推进（文档 §3.2 物理约束步频） ═══
-    // 速度源：改用 WS tick 速度（每 0.1s 更新一次）。
-    // 之前用 lerp 后 smoothedPos 的帧间差分，受插值波动影响，vel 在 0.4~1.2 间脉冲；
-    // 用 WS tick 速度后，vel 稳定在 0.5 m/s，与 mock 物理速度一致。
-    const FIXED_DT = 1 / 60  // 固定 60Hz 步态时钟
-    if (g.turnState !== 'turning' && g.wsTickVel > 0.0001) {
-      g.emaFrameVel += (g.wsTickVel - g.emaFrameVel) * clamp(dt / 0.15, 0, 1)
-    }
-    // 硬上限：防止任何边界条件（转向退出、WS 抖动）导致步频飙升
+    // ═══ 3. 步态相位推进（物理一致步频）═══
+    // 一个相位周期 = 左右各迈一步 = 2 步，所以分母是 2×stepLength。
+    // 之前用 vel/stepLength，步频快了一倍，脚在地上滑（太空步）
+    g.emaFrameVel += (speed - g.emaFrameVel) * clamp(dt / 0.15, 0, 1)
     g.emaFrameVel = clamp(g.emaFrameVel, 0, 1.2)
-    // walking 时按物理速度约束步频；turning 时原地踏步，baseFreq 固定 0.4 + 转向 boost
-    const baseFreq = g.turnState === 'turning'
-      ? 0.4
-      : clamp(g.emaFrameVel / PARAMS.stepLength, 0.3, 1.6)
-    // 小幅度转向增加步频（让原地转向也有步态节奏，但不夸张）
+    const walkFreq = stepFrequency(g.emaFrameVel, PARAMS.stepLength)
+    // 急转（交叉步）时保底 0.4Hz 原地踏步节奏
+    const baseFreq = g.turnState === 'turning' ? Math.max(walkFreq, 0.4) : walkFreq
     const turnBoost = clamp(g.yawVel * 0.12, 0, 0.25)
     const targetFreq = baseFreq + turnBoost
-    // lerp 平滑过渡 —— 同样用固定 dt
+
+    const FIXED_DT = 1 / 60  // 固定 60Hz 步态时钟
     g.currentFreq += (targetFreq - g.currentFreq) * clamp(FIXED_DT * PARAMS.speedBlend, 0, 1)
-    // phase 始终推进！不再 if (walking) { ... }
     g.phase += g.currentFreq * FIXED_DT * 2 * Math.PI
 
     // idle ↔ walk 平滑过渡
-    // 用 baseFreq 判定：只要 anchor 动过一次，baseFreq floor 0.3 就永远保持
-    // （即使原地转向速度 ≈ 0，baseFreq 仍 ≥ 0.3）→ idleBlend 自然归 0
-    const isMoving = baseFreq > 0.25 || g.yawVel > 0.3
+    const isMoving = speed > 0.08 || g.yawVel > 0.3
     const targetIdle = isMoving ? 0 : 1
     g.idleBlend += (targetIdle - g.idleBlend) * (1 - Math.pow(0.01, FIXED_DT))
 
@@ -700,8 +653,9 @@ function G1Model({ position, rotation, scale, onLoaded, onError }: G1ModelProps)
       g.smoothedPos[1] + bobOffset + idleBreathY,
       g.smoothedPos[2] + idleBreathZ,
     )
-    // mock 服务器约定 (0=+X 东, π/2=+Z 北) → three.js rotation.y (-θ-π/2)
-    const anchorRotY = -g.smoothedTheta - Math.PI / 2
+    // G1 URDF 前向 = 局部 +X：移动方向 (cosθ, sinθ) 需 Ry(-θ)
+    // （局部 +X → 世界 (cos(-θ), -sin(-θ)) = (cosθ, sinθ)，实测脚踝连线标定）
+    const anchorRotY = thetaToRotY(g.smoothedTheta)
     g1Anchor.rotation.set(0, isFinite(anchorRotY) ? anchorRotY : 0, 0)
     g1Anchor.scale.set(scaleRef.current, scaleRef.current, scaleRef.current)
 
@@ -709,15 +663,13 @@ function G1Model({ position, rotation, scale, onLoaded, onError }: G1ModelProps)
     const phase = g.phase
     const blend = 1 - g.idleBlend
 
-    // ── 速度与摆幅联动（文档 §3.2） ──
-    // 用 emaFrameVel（快速 EMA 后的帧间速度）算视觉步幅
-    const TARGET_STEP_LEN = PARAMS.stepLength  // 目标步长 m
-    const visualStepDisp = g.currentFreq > 0
-      ? g.emaFrameVel / g.currentFreq
-      : TARGET_STEP_LEN
-    // legAmp 以 TARGET_STEP_LEN 为基准：实际步长 / 目标步长 * 基准系数
-    // 下限改为 0：慢速/停顿时腿自然静止，保证步伐大小严格匹配物理移动距离
-    const legAmp = clamp((visualStepDisp / TARGET_STEP_LEN) * 0.85, 0, 1.2)
+    // ── 速度与摆幅联动：视觉迈步距离 = 物理移动距离（脚不打滑） ──
+    const TARGET_STEP_LEN = PARAMS.stepLength  // 目标单步步长 m
+    // 实际单步步长 → 摆幅系数：0=静止收腿，1=满步幅
+    const legAmp = legAmplitude(actualStepLength(g.emaFrameVel, g.currentFreq), TARGET_STEP_LEN)
+    // 物理步幅角：asin(步长/2/腿长)。2×LEG_LEN×sin(pitch) = 视觉迈步距离 = 物理步长
+    // 之前固定 0.85rad(49°)，脚甩 1.3m 但身体只走 0.45m → 太空步滑脚
+    const pitchAmpBase = stridePitchAmplitude(TARGET_STEP_LEN, LEG_LEN)
     const speedFactor = clamp(g.emaFrameVel / 2.0, 0, 1)
     const armAmp = PARAMS.armSwing * (1 + speedFactor * 0.3)
 
@@ -732,7 +684,7 @@ function G1Model({ position, rotation, scale, onLoaded, onError }: G1ModelProps)
     const walkBlend = 1 - turnBlend
 
     // 基础前后迈步振幅（walking 正常，turning 大幅降低）
-    const pitchAmp = legAmp * (0.85 * walkBlend + 0.25 * turnBlend)
+    const pitchAmp = pitchAmpBase * legAmp * (0.9 * walkBlend + 0.3 * turnBlend)
 
     // 向左转（headingError > 0）→ 左腿内侧缩短，右腿外侧加长
     // 向右转相反
@@ -740,9 +692,10 @@ function G1Model({ position, rotation, scale, onLoaded, onError }: G1ModelProps)
     const rightStride = pitchAmp * (1 + turnFactor * 0.35 * turnSign)
 
     // turning 时侧向幅度加大：hipRoll 与 hipYaw 形成交叉转身
-    const rollAmp = legAmp * (0.18 * walkBlend + 0.55 * turnBlend)
-    const yawAmp = legAmp * (0.25 * walkBlend + 0.70 * turnBlend)
-    const kneeAmp = legAmp * (1.5 * walkBlend + 0.6 * turnBlend)
+    // 直行时 hipYaw/hipRoll 接近 0（人走路腿不外八），转向才展开
+    const rollAmp = legAmp * (0.10 * walkBlend + 0.55 * turnBlend)
+    const yawAmp = legAmp * (0.06 * walkBlend + 0.70 * turnBlend)
+    const kneeAmp = legAmp * (1.1 * walkBlend + 0.6 * turnBlend)
 
     // ── 左腿 ──
     const lHipPitch = Math.sin(phase) * leftStride

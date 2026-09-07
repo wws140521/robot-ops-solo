@@ -1,171 +1,113 @@
 <?xml version="1.0"?>
-<robot name="kuka_kr10_r1100">
+<!-- KUKA KR 6 R900 sixx 官方模型：STL 由 ros-industrial/kuka_experimental 的 DAE 转换而来 -->
+<!-- 关节参数来自 kuka_kr6_support/urdf/kr6r900sixx_macro.xacro，Z-up 米制，加载时需要 convertToYUp -->
+<robot name="kuka_kr6r900sixx">
 
-  <material name="kuka_white">
-    <color rgba="0.96 0.96 0.96 1.0"/>
-  </material>
-  <material name="kuka_orange">
-    <color rgba="1.0 0.55 0.1 1.0"/>
-  </material>
+  <material name="kuka_orange"><color rgba="0.965 0.471 0.157 1.0"/></material>
+  <material name="kuka_pedestal"><color rgba="0.506 0.471 0.388 1.0"/></material>
 
-  <!-- base link -->
-  <link name="base">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="18.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="base_link">
     <visual>
-      <origin xyz="0 0 0.1375"/>
-      <geometry>
-        <mesh filename="package://kuka_kr10_support/meshes/base_link.STL"/>
-      </geometry>
-      <material name="kuka_white"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://kuka_kr10_support/meshes/base_link.stl"/></geometry>
+      <material name="kuka_pedestal"/>
     </visual>
   </link>
 
-  <link name="j1">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="9.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_1">
     <visual>
-      <origin xyz="0 0 -0.075"/>
-      <geometry>
-        <mesh filename="package://kuka_kr10_support/meshes/j1_link.STL"/>
-      </geometry>
-      <material name="kuka_white"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://kuka_kr10_support/meshes/link_1.stl"/></geometry>
+      <material name="kuka_orange"/>
     </visual>
   </link>
 
-  <link name="j2">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="11.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_2">
     <visual>
-      <origin xyz="0 0 -0.15"/>
-      <geometry>
-        <mesh filename="package://kuka_kr10_support/meshes/j2_link.STL"/>
-      </geometry>
-      <material name="kuka_white"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://kuka_kr10_support/meshes/link_2.stl"/></geometry>
+      <material name="kuka_orange"/>
     </visual>
   </link>
 
-  <link name="j3">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="7.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_3">
     <visual>
-      <origin xyz="0 0 -0.11"/>
-      <geometry>
-        <mesh filename="package://kuka_kr10_support/meshes/j3_link.STL"/>
-      </geometry>
-      <material name="kuka_white"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://kuka_kr10_support/meshes/link_3.stl"/></geometry>
+      <material name="kuka_orange"/>
     </visual>
   </link>
 
-  <link name="j4">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="3.5"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_4">
     <visual>
-      <origin xyz="0 0 -0.05"/>
-      <geometry>
-        <mesh filename="package://kuka_kr10_support/meshes/j4_link.STL"/>
-      </geometry>
-      <material name="kuka_white"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://kuka_kr10_support/meshes/link_4.stl"/></geometry>
+      <material name="kuka_orange"/>
     </visual>
   </link>
 
-  <link name="j5">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="1.8"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_5">
     <visual>
-      <origin xyz="0 0 -0.04"/>
-      <geometry>
-        <mesh filename="package://kuka_kr10_support/meshes/j5_link.STL"/>
-      </geometry>
-      <material name="kuka_white"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://kuka_kr10_support/meshes/link_5.stl"/></geometry>
+      <material name="kuka_orange"/>
     </visual>
   </link>
 
-  <link name="j6">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="0.8"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_6">
     <visual>
-      <origin xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="package://kuka_kr10_support/meshes/j6_link.STL"/>
-      </geometry>
-      <material name="kuka_white"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://kuka_kr10_support/meshes/link_6.stl"/></geometry>
+      <material name="kuka_pedestal"/>
     </visual>
   </link>
 
-  <!-- base -> j1 绕Y轴 -->
-  <joint name="joint_1" type="revolute">
-    <origin xyz="0 0 0.275" rpy="0 0 0"/>
-    <parent link="base"/>
-    <child link="j1"/>
+  <joint name="joint_a1" type="revolute">
+    <origin xyz="0 0 0.400" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="link_1"/>
+    <axis xyz="0 0 -1"/>
+    <limit lower="-2.967060" upper="2.967060" effort="100" velocity="6.283185"/>
+  </joint>
+
+  <joint name="joint_a2" type="revolute">
+    <origin xyz="0.025 0 0" rpy="0 0 0"/>
+    <parent link="link_1"/>
+    <child link="link_2"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-2.967059728" upper="2.967059728" effort="100" velocity="3.14"/>
+    <limit lower="-3.316126" upper="0.785398" effort="100" velocity="5.235988"/>
   </joint>
 
-  <!-- j1 -> j2 绕X轴 -->
-  <joint name="joint_2" type="revolute">
-    <origin xyz="0 0 -0.15" rpy="0 0 0"/>
-    <parent link="j1"/>
-    <child link="j2"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-1.570796327" upper="2.617993878" effort="100" velocity="2.094"/>
-  </joint>
-
-  <!-- j2 -> j3 绕X轴 -->
-  <joint name="joint_3" type="revolute">
-    <origin xyz="0 0 -0.30" rpy="0 0 0"/>
-    <parent link="j2"/>
-    <child link="j3"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-2.617993878" upper="1.570796327" effort="100" velocity="2.094"/>
-  </joint>
-
-  <!-- j3 -> j4 绕X轴 -->
-  <joint name="joint_4" type="revolute">
-    <origin xyz="0 0 -0.22" rpy="0 0 0"/>
-    <parent link="j3"/>
-    <child link="j4"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-3.839724354" upper="3.839724354" effort="50" velocity="4.189"/>
-  </joint>
-
-  <!-- j4 -> j5 绕Y轴 -->
-  <joint name="joint_5" type="revolute">
-    <origin xyz="0 0 -0.10" rpy="0 0 0"/>
-    <parent link="j4"/>
-    <child link="j5"/>
+  <joint name="joint_a3" type="revolute">
+    <origin xyz="0.455 0 0" rpy="0 0 0"/>
+    <parent link="link_2"/>
+    <child link="link_3"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-2.443460953" upper="2.443460953" effort="50" velocity="3.141"/>
+    <limit lower="-2.094395" upper="2.722714" effort="100" velocity="6.283185"/>
   </joint>
 
-  <!-- j5 -> j6 绕X轴 -->
-  <joint name="joint_6" type="revolute">
-    <origin xyz="0 0 -0.08" rpy="0 0 0"/>
-    <parent link="j5"/>
-    <child link="j6"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-6.283185307" upper="6.283185307" effort="30" velocity="6.283"/>
+  <joint name="joint_a4" type="revolute">
+    <origin xyz="0 0 0.035" rpy="0 0 0"/>
+    <parent link="link_3"/>
+    <child link="link_4"/>
+    <axis xyz="-1 0 0"/>
+    <limit lower="-3.228859" upper="3.228859" effort="50" velocity="6.651684"/>
+  </joint>
+
+  <joint name="joint_a5" type="revolute">
+    <origin xyz="0.420 0 0" rpy="0 0 0"/>
+    <parent link="link_4"/>
+    <child link="link_5"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.094395" upper="2.094395" effort="50" velocity="6.773870"/>
+  </joint>
+
+  <joint name="joint_a6" type="revolute">
+    <origin xyz="0.080 0 0" rpy="0 0 0"/>
+    <parent link="link_5"/>
+    <child link="link_6"/>
+    <axis xyz="-1 0 0"/>
+    <limit lower="-6.108652" upper="6.108652" effort="30" velocity="10.733775"/>
   </joint>
 
 </robot>

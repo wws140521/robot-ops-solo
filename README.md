@@ -155,23 +155,39 @@ robot-ops-solo/
 │   │   ├── src/
 │   │   │   ├── robots/
 │   │   │   │   ├── index.ts            #     机器人模型注册表 · renderRobotModel(brand) 按品牌分发
-│   │   │   │   ├── G1Dog.tsx           #     宇树 G1 人形机器人 3D 模型 · 关节动画
+│   │   │   │   ├── G1Humanoid.tsx      #     宇树 G1 人形机器人 · URDF+STL 真实模型 + 程序化步态 + 模块级永久 anchor 防重挂载
+│   │   │   │   ├── gaitMath.ts         #     步态纯函数库 · 步频/步幅角/航向跟踪/朝向映射/tick 插值（可单测）
+│   │   │   │   ├── __tests__/          #     步态数学单元测试 · gaitMath.test.ts（33 例）
+│   │   │   │   ├── IndustrialRobotModel.tsx # 工业机械臂 URDF 模型 · 4 品牌高细节 STL + useFrame 关节插值
+│   │   │   │   ├── G1Dog.tsx           #     宇树 G1 几何简化模型（降级用）
 │   │   │   │   ├── PeanutBot.tsx       #     普渡花生机器人 3D 模型 · 差速驱动
-│   │   │   │   ├── FanucArm.tsx        #     FANUC M-20iD 6 轴机械臂 · 基座+6关节+法兰+夹爪
-│   │   │   │   └── KukaArm.tsx         #     KUKA KR6 6 轴机械臂 · 橙色涂装+关节联动
+│   │   │   │   ├── FanucArm.tsx        #     FANUC M-20iD 6 轴机械臂 · 基座+6关节+法兰+夹爪（降级几何版）
+│   │   │   │   ├── KukaArm.tsx         #     KUKA KR6 6 轴机械臂 · 橙色涂装+关节联动（降级几何版）
+│   │   │   │   ├── JointChain.tsx      #     关节链基元 · JointPivot/LinkSegment/JointBall
+│   │   │   │   └── nativeG1.ts         #     原生 three.js G1 加载（非 R3F · 供 AMap GLCustomLayer 用）
+│   │   │   ├── dance/
+│   │   │   │   ├── useDancePlayer.ts   #     舞蹈播放器 hook · 关键帧插值驱动
+│   │   │   │   └── subject3-keyframes.ts #   舞蹈关键帧定义 + G1 关节名映射
 │   │   │   ├── environment/
-│   │   │   │   ├── Floor.tsx           #   金属感地面 · MeshReflectorMaterial 实时反射 · CSS 变量桥接
+│   │   │   │   ├── Floor.tsx           #   地面 · 商用哑光细网格 / 工业混凝土膨胀缝双场景 · CSS 变量桥接
+│   │   │   │   ├── IndustrialPedestal.tsx # 工业基座 · 混凝土基墩+钢底板+地脚螺栓
+│   │   │   │   ├── SceneAssets.tsx     #   共享场景资产组件
 │   │   │   │   ├── SlamMap.tsx         #   SLAM 建图叠加 · 障碍物渲染
 │   │   │   │   └── collision.ts       #   碰撞检测工具 · AABB 包围盒 · 穿模检测
+│   │   │   ├── config/
+│   │   │   │   └── industrial-models.ts #  工业模型配置 · 4 品牌 URDF 路径/关节映射/缩放
+│   │   │   ├── map/
+│   │   │   │   └── mapCoords.ts        #   室外模式坐标转换 · 经纬度 → 世界坐标（GCJ-02）
 │   │   │   ├── hooks/
 │   │   │   │   └── useScenePalette.ts  #   3D 场景色彩钩子 · CSS 变量 → Three.js 色值桥接
 │   │   │   ├── overlays/
+│   │   │   │   ├── StateMachine.tsx    #   状态机徽章 · IDLE/MOVING/WORKING/CHARGING · sm/md/lg 三档
 │   │   │   │   ├── TrajectoryLine.tsx #   轨迹线 · 历史路径渲染
 │   │   │   │   ├── GlowTrajectory.tsx  #   发光轨迹 · 渐变尾迹效果
 │   │   │   │   ├── StatusBadge.tsx    #   状态标签 · 3D 空间中悬浮文字
 │   │   │   │   └── HUDLabel.tsx       #   HUD 标签 · drei Html 空间锚定机器人 ID/电量/状态
 │   │   │   ├── RobotViewer.tsx         #   3D 查看器主组件 · Canvas+AdaptiveDpr+Suspense+HUDLabel
-│   │   │   └── index.ts                #   包入口（重导出 FanucArm/KukaArm/HUDLabel + renderRobotModel）
+│   │   │   └── index.ts                #   包入口（重导出 G1Humanoid/IndustrialRobotModel/StateMachine 等）
 │   │   └── tsconfig.json
 │   │
 │   └── ui-kit/                         # React 包 · 跨页面共用 UI 组件
@@ -370,8 +386,10 @@ python3 edge-poller.py
 ### 单元测试
 
 ```bash
-pnpm test:adapter-kit    # adapter-kit 全部测试（商用 + 工业 36 个用例）
-pnpm build:all           # 递归构建所有包
+pnpm test:adapter-kit              # adapter-kit 全部测试（商用 + 工业 47 个用例）
+pnpm --filter digital-twin test    # digital-twin 步态数学测试（33 例 · 防太空步/螃蟹步/转向抽搐回归）
+pnpm test                          # 全 workspace 测试
+pnpm build:all                     # 递归构建所有包
 ```
 
 ## 登录账号

@@ -446,168 +446,440 @@ const INDUSTRIAL_ALARM_POOLS = {
     { raw_code: 'EST-3008', udm_code: 'ENCODER_ERROR', severity: 'error', zh_desc: '编码器异常' },
     { raw_code: 'EST-4001', udm_code: 'COMM_LOSS', severity: 'warning', zh_desc: '通信中断' },
   ],
+  yaskawa: [
+    { raw_code: 'ALARM 1911034', udm_code: 'SRV_0034_SERVO_OVERLOAD', severity: 'error', zh_desc: '伺服过载（S1 电机过热）' },
+    { raw_code: 'ALARM 3170', udm_code: 'PLAYBACK_ERROR', severity: 'warning', zh_desc: '再现执行异常' },
+    { raw_code: 'ALARM 4317', udm_code: 'SV_0341_ADC_ERROR', severity: 'warning', zh_desc: '编码器通信异常' },
+  ],
 }
 
-// 随机生成工业告警（15% 概率每次发一条）
-function generateIndustrialAlarms(brand) {
-  if (Math.random() > 0.15) return []
-  const pool = INDUSTRIAL_ALARM_POOLS[brand] || []
-  if (pool.length === 0) return []
-  const alarm = pool[Math.floor(Math.random() * pool.length)]
-  return [{
-    ...alarm,
-    occurred_at: new Date().toISOString(),
-    cleared: false,
-  }]
+// ───────────── 工业机械臂运动仿真器 ─────────────
+// 以前每个关节独立 sin 摆动，看着像面条舞——真机器人不这么动。
+// 这里模拟真实控制器的关节空间插补：
+//   1. 示教路点程序（抓取/搬运/放置 + 到位停留）
+//   2. 梯形速度曲线（加速-匀速-减速），所有关节同起同止
+//   3. 状态联动：WORKING 循环执行 / IDLE 回原点等料 / 报警冻结在原地
+//   4. speed_rpm 从真实角速度换算，负载/电流随运动起伏
+
+// [min, max) 区间随机数
+function rand(a, b) { return a + Math.random() * (b - a) }
+
+// 单关节梯形速度曲线的最短时间（vmax rad/s，amax rad/s²）
+// 行程短走三角形轮廓，行程长走完整梯形
+function trapMinTime(dq, vmax, amax) {
+  const adq = Math.abs(dq)
+  if (adq < 1e-6) return 0
+  if (adq <= (vmax * vmax) / amax) {
+    // 三角形：加减速各一半，t = 2*sqrt(dq/a)
+    return 2 * Math.sqrt(adq / amax)
+  }
+  // 梯形：巡航 + 两侧斜坡
+  return adq / vmax + vmax / amax
 }
 
-// 生成工业机械臂 6 轴笛卡尔 pose（模拟 TCP 位置）
-function generateIndustrialPose(seed) {
-  const r = (min, max) => +(min + Math.random() * (max - min)).toFixed(1)
-  return {
-    x: r(-500, 500),
-    y: r(-500, 500),
-    z: r(0, 1500),
-    rx: r(-180, 180),
-    ry: r(-180, 180),
-    rz: r(-180, 180),
+// 一段同步插补：所有关节同时起步同时到位（真实控制器的关节插补）
+// 段时长 T 由最慢的关节决定，快的关节自动放慢速度陪着走
+class SegProfile {
+  constructor(q0, q1, T) {
+    this.q0 = q0
+    this.dq = q1.map((v, i) => v - q0[i])
+    this.T = T
+    // 加速时间取 T 的 25%，但最多 T/2（不然没匀速段了）
+    this.ta = Math.min(T * 0.25, T / 2)
+    // 每个关节自己的峰值速度：走 dq_i 用满 T
+    this.vp = this.dq.map((d) => (T - this.ta > 0 ? d / (T - this.ta) : 0))
+  }
+
+  // t 秒时刻的位置和角速度
+  sample(t) {
+    const q = []
+    const w = []
+    for (let i = 0; i < this.dq.length; i++) {
+      const d = this.dq[i]
+      const vp = this.vp[i]
+      let s = 0
+      let v = 0
+      if (t <= 0) {
+        s = 0; v = 0
+      } else if (t >= this.T) {
+        s = d; v = 0
+      } else if (t < this.ta) {
+        // 加速段
+        s = 0.5 * (vp / this.ta) * t * t
+        v = (vp / this.ta) * t
+      } else if (t <= this.T - this.ta) {
+        // 匀速段
+        s = vp * (t - this.ta / 2)
+        v = vp
+      } else {
+        // 减速段：倒着算更稳
+        const t2 = this.T - t
+        s = d - 0.5 * (vp / this.ta) * t2 * t2
+        v = (vp / this.ta) * t2
+      }
+      q.push(this.q0[i] + s)
+      w.push(v)
+    }
+    return { q, w }
   }
 }
 
-function mockFanucTelemetry() {
-  const now = new Date().toISOString()
-  const t = Date.now() / 1000
+// 一台机器人的仿真器：路点程序 + 状态机，内部全按壁钟时间推进
+class IndustrialRobotSim {
+  constructor(cfg) {
+    this.cfg = cfg
+    this.q = [...cfg.home]          // 当前关节角
+    this.w = [0, 0, 0, 0, 0, 0]     // 当前角速度 rad/s
+    this.seg = null                  // 当前运动段
+    this.segStart = 0
+    this.dwellUntil = 0              // 到位停留的截止时刻
+    this.stepIdx = 0                 // 程序执行到第几个路点
+    this.mode = 'working'            // working | idle
+    this.cycles = 0                  // 本次会话跑完的整循环数
+    this.alarm = null                // 活动告警（null = 无）
+    this.alarmUntil = 0
+    this.nextAlarmAt = Date.now() + rand(30e3, 90e3)
+    this.idleAt = Date.now() + rand(35e3, 80e3)  // 下次进入等料窗口
+    this.workAt = 0                  // 等料结束恢复生产的时刻
+    this.temp = [...cfg.temp]        // 关节温度（会慢慢漂）
+    this.lastT = Date.now()
+  }
+
+  // 推进一个时刻，返回 { q, w, status, alarms }
+  sample(now) {
+    const c = this.cfg
+
+    // ── 报警事件：到点触发，持续一阵自己恢复 ──
+    if (this.alarm) {
+      if (now >= this.alarmUntil) {
+        this.alarm = null
+        this.nextAlarmAt = now + rand(50e3, 100e3)
+        this.seg = null // 解除后从当前位置重建运动段（真实控制器恢复执行）
+      }
+    } else if (now >= this.nextAlarmAt) {
+      const pool = INDUSTRIAL_ALARM_POOLS[c.brand] || []
+      if (pool.length > 0) {
+        const a = pool[Math.floor(Math.random() * pool.length)]
+        this.alarm = { ...a, occurred_at: new Date(now).toISOString(), cleared: false, emitted: false }
+        this.alarmUntil = now + rand(12e3, 25e3)
+      } else {
+        this.nextAlarmAt = now + 60e3
+      }
+    }
+
+    // ── 等料窗口：工作一段时间歇一会儿，模拟上游没料/换型 ──
+    if (!this.alarm) {
+      if (this.mode === 'working' && now >= this.idleAt) {
+        this.mode = 'idle'
+        this.workAt = now + rand(8e3, 20e3)
+        this.seg = null
+      } else if (this.mode === 'idle' && now >= this.workAt) {
+        this.mode = 'working'
+        this.idleAt = now + rand(40e3, 90e3)
+        this.stepIdx = 0
+        this.seg = null
+      }
+    }
+
+    // ── 运动推进 ──
+    if (this.alarm) {
+      // 报警冻结：位置保持，速度清零（急停锁轴）
+      this.w = [0, 0, 0, 0, 0, 0]
+    } else if (this.mode === 'working') {
+      this.advance(now, c.program[this.stepIdx], () => {
+        this.stepIdx = (this.stepIdx + 1) % c.program.length
+        if (this.stepIdx === 0) this.cycles++
+      })
+    } else {
+      // 空闲：慢速回 home 停着
+      this.advance(now, { q: c.home, dwell: 0, v: 0.4 })
+    }
+
+    // ── 温度：向「基线 + 运动热量」一阶惯性漂移 ──
+    const dt = Math.max(0, (now - this.lastT) / 1000)
+    this.lastT = now
+    for (let i = 0; i < this.temp.length; i++) {
+      const motion = Math.min(1, Math.abs(this.w[i]) / c.vmax[i])
+      const target = c.temp[i] + 6 * motion
+      this.temp[i] += (target - this.temp[i]) * Math.min(1, dt / 90)
+    }
+
+    // ── 组装状态和告警 ──
+    let status
+    if (this.alarm) {
+      status = this.alarm.severity === 'error' ? 'error' : 'idle'
+    } else {
+      status = this.mode
+    }
+
+    // 告警只在触发那一帧发出去，前端 alertStore 会累积存着；
+    // 持续发同一条会把 store 刷爆（那边没去重）
+    const alarms = []
+    if (this.alarm && !this.alarm.emitted) {
+      this.alarm.emitted = true
+      const { emitted, ...a } = this.alarm
+      alarms.push(a)
+    }
+
+    return { q: this.q, w: this.w, status, alarms }
+  }
+
+  // 朝目标路点推进一段（梯形插补 + 到位停留）
+  advance(now, step, onDone) {
+    const c = this.cfg
+    if (!this.seg) {
+      const diff = Math.max(...step.q.map((qi, i) => Math.abs(qi - this.q[i])))
+      if (diff < 1e-4) {
+        // 已在目标位上，看停留到没到
+        this.w = [0, 0, 0, 0, 0, 0]
+        if (now >= this.dwellUntil && onDone) onDone()
+        return
+      }
+      const vScale = step.v ?? 1
+      const times = step.q.map((qi, i) => trapMinTime(qi - this.q[i], c.vmax[i] * vScale, c.amax[i]))
+      this.seg = new SegProfile(this.q, step.q, Math.max(...times))
+      this.segStart = now
+    }
+    const t = (now - this.segStart) / 1000
+    if (t >= this.seg.T) {
+      // 到位：吸附终点，进入停留（模拟抓取/放料动作）
+      this.q = [...step.q]
+      this.w = [0, 0, 0, 0, 0, 0]
+      this.seg = null
+      this.dwellUntil = now + (step.dwell ?? 0) * 1000
+      if ((step.dwell ?? 0) === 0 && onDone) onDone()
+    } else {
+      const r = this.seg.sample(t)
+      this.q = r.q
+      this.w = r.w
+    }
+  }
+}
+
+// 简化正运动学：底座旋转 + 平面二连杆，估个 TCP 大致位置
+// 够 mock 遥测用了，别拿去算碰撞
+function approxFK(q, d) {
+  const [j1, j2, j3, j4, j5, j6] = q
+  const r = d.shoulderX + d.upperArm * Math.sin(j2) + d.forearm * Math.sin(j2 + j3)
+  const z = d.baseH + d.upperArm * Math.cos(j2) + d.forearm * Math.cos(j2 + j3)
   return {
-    type: 'industrial_state',
+    x: +(Math.cos(j1) * r * 1000).toFixed(1),
+    y: +(Math.sin(j1) * r * 1000).toFixed(1),
+    z: +(Math.max(0, z) * 1000).toFixed(1),
+    rx: +((j4 * 180) / Math.PI).toFixed(1),
+    ry: +((j5 * 180) / Math.PI).toFixed(1),
+    rz: +((j6 * 180) / Math.PI).toFixed(1),
+  }
+}
+
+// 四台机器人的仿真配置：
+// vmax/amax 参考 3D 模型用的官方 URDF 参数（不同机型速度档位不一样）
+// 路点角度都对着各自 URDF 的零位约定调过，浏览器里肉眼验过型
+const ROBOT_SIM_CFG = [
+  {
     brand: 'fanuc',
-    payload: {
-      robot_id: 'FANUC_M20iD_001',
-      model: 'M-20iD/25',
-      timestamp: now,
-      pose: generateIndustrialPose(),
-      joints: [
-        { j: 1, angle_rad: Math.sin(t * 0.5) * 0.8, load_pct: 62, temp_c: 41, current_a: 3.1, speed_rpm: 120, health_score: 88 },
-        { j: 2, angle_rad: 0.3 + Math.sin(t * 0.7) * 0.4, load_pct: 118, temp_c: 67, current_a: 5.4, speed_rpm: 90, health_score: 54, rul_days: 9 },
-        { j: 3, angle_rad: -0.5 + Math.sin(t * 0.9) * 0.3, load_pct: 45, temp_c: 38, current_a: 2.1, speed_rpm: 150, health_score: 92 },
-        { j: 4, angle_rad: Math.sin(t * 1.1) * 0.6, load_pct: 30, temp_c: 35, current_a: 1.8, speed_rpm: 200, health_score: 95 },
-        { j: 5, angle_rad: Math.sin(t * 1.3) * 0.5, load_pct: 25, temp_c: 33, current_a: 1.2, speed_rpm: 180, health_score: 97 },
-        { j: 6, angle_rad: Math.sin(t * 1.5) * 0.4, load_pct: 18, temp_c: 31, current_a: 0.9, speed_rpm: 240, health_score: 99 },
-      ],
-      alarms: generateIndustrialAlarms('fanuc'),
-      runtime: {
-        power_on_hours: 18432,
-        operating_hours: 15200,
-        cycle_count: 120321,
-        last_maintenance_at: '2026-06-15T10:00:00+08:00',
-        payload_kg: 12,
-      },
-      extensions: {
-        r_register_200: Math.floor(Math.random() * 100),
-        d_parameter_101: +(5 + Math.random() * 2).toFixed(2),
-        tool_life_remaining: Math.floor(800 + Math.random() * 200),
-        macro_status: 'M98 P1001',
-        servo_alarm_history: '无',
-      },
+    id: 'FANUC_M20iD_001',
+    model: 'M-20iD/25',
+    // 机床上下料：左侧取件 → 右侧放件，典型的双工位节拍
+    home: [0, 0.3, -0.5, 0, 0.2, 0],
+    program: [
+      { q: [0.7, 0.85, -1.15, 0, 0.45, 0.7], dwell: 0.7, v: 1.0 },   // 取料点上方（快进）
+      { q: [0.7, 1.15, -1.55, 0, 0.4, 0.7], dwell: 0.9, v: 0.45 },    // 下降取料（慢，护工件）
+      { q: [0.7, 0.75, -1.0, 0, 0.5, 0.7], dwell: 0.3, v: 0.6 },     // 抬升
+      { q: [-0.6, 0.75, -1.0, 0, 0.5, -0.7], dwell: 0, v: 0.85 },    // 旋转到放料侧
+      { q: [-0.6, 1.15, -1.55, 0, 0.4, -0.7], dwell: 0.9, v: 0.45 }, // 下降放料
+      { q: [-0.6, 0.85, -1.15, 0, 0.45, -0.7], dwell: 0.3, v: 0.6 }, // 抬升
+      { q: [0, 0.3, -0.5, 0, 0.2, 0], dwell: 0, v: 0.9 },            // 回 home
+    ],
+    vmax: [2.25, 2.1, 2.9, 3.75, 3.1, 4.6],
+    amax: [5.6, 5.2, 7.2, 9.4, 7.8, 11.5],
+    load: [85, 118, 45, 30, 25, 18],      // J1 黄色预警 / J2 红色超载是故意的演示数据
+    temp: [41, 67, 38, 35, 33, 31],
+    current: [3.1, 5.4, 2.1, 1.8, 1.2, 0.9],
+    health: [88, 54, 92, 95, 97, 99],
+    rul: { 2: 9 },                          // J2 剩余寿命 9 天（演示）
+    fk: { baseH: 0.525, shoulderX: 0.15, upperArm: 0.79, forearm: 0.935 },
+    runtime: {
+      power_on_hours: 18432,
+      operating_hours: 15200,
+      cycle_count: 120321,
+      last_maintenance_at: '2026-06-15T10:00:00+08:00',
+      payload_kg: 12,
     },
-  }
-}
-
-function mockKukaTelemetry() {
-  const now = new Date().toISOString()
-  const t = Date.now() / 1000
-  return {
-    type: 'industrial_state',
+    extensions: () => ({
+      r_register_200: Math.floor(Math.random() * 100),
+      d_parameter_101: +(5 + Math.random() * 2).toFixed(2),
+      tool_life_remaining: Math.floor(800 + Math.random() * 200),
+      macro_status: 'M98 P1001',
+      servo_alarm_history: '无',
+    }),
+  },
+  {
     brand: 'kuka',
-    payload: {
-      robot_id: 'KUKA_KR6_001',
-      model: 'KR 6 R900 sixx',
-      timestamp: now,
-      pose: generateIndustrialPose(),
-      joints: [
-        { j: 1, angle_rad: Math.sin(t * 0.4) * 0.7, load_pct: 35, temp_c: 36, current_a: 2.0, speed_rpm: 100, health_score: 90 },
-        { j: 2, angle_rad: 0.2 + Math.sin(t * 0.6) * 0.5, load_pct: 55, temp_c: 42, current_a: 3.0, speed_rpm: 80, health_score: 82 },
-        { j: 3, angle_rad: -0.3 + Math.sin(t * 0.8) * 0.4, load_pct: 40, temp_c: 37, current_a: 2.2, speed_rpm: 110, health_score: 88 },
-        { j: 4, angle_rad: Math.sin(t * 1.0) * 0.5, load_pct: 22, temp_c: 32, current_a: 1.1, speed_rpm: 160, health_score: 95 },
-        { j: 5, angle_rad: Math.sin(t * 1.2) * 0.4, load_pct: 18, temp_c: 30, current_a: 0.8, speed_rpm: 200, health_score: 97 },
-        { j: 6, angle_rad: Math.sin(t * 1.4) * 0.3, load_pct: 12, temp_c: 28, current_a: 0.5, speed_rpm: 220, health_score: 99 },
-      ],
-      alarms: generateIndustrialAlarms('kuka'),
-      runtime: {
-        power_on_hours: 12300,
-        cycle_count: 85000,
-        last_maintenance_at: '2026-07-01T10:00:00+08:00',
-      },
-      extensions: {
-        safety_gate_open: Math.random() > 0.8,
-        robroot_offset_x: +(Math.random() * 0.5).toFixed(3),
-        robroot_offset_y: +(Math.random() * 0.5).toFixed(3),
-        safety_controller_state: 'ACTIVE',
-        axis_soft_limit: '正常',
-      },
+    id: 'KUKA_KR6_001',
+    model: 'KR 6 R900 sixx',
+    // 小件装配插装：取件 → 转位 → 慢速下插 → 拔出，节拍快行程小
+    home: [0, 0.45, -0.35, 0, -0.1, 0],
+    program: [
+      { q: [0.6, 0.55, -0.55, 0, -0.1, 0.6], dwell: 0.5, v: 1.0 },   // 取件
+      { q: [-0.6, 0.55, -0.55, 0, -0.1, -0.6], dwell: 0.3, v: 0.9 }, // 转到装配位
+      { q: [-0.6, 0.75, -0.35, 0, -0.2, -0.6], dwell: 0.7, v: 0.35 },// 慢速下插
+      { q: [-0.6, 0.55, -0.55, 0, -0.1, -0.6], dwell: 0.2, v: 0.35 },// 拔出
+      { q: [0, 0.45, -0.35, 0, -0.1, 0], dwell: 0, v: 0.8 },         // 回 home
+    ],
+    vmax: [2.63, 2.51, 3.4, 4.71, 4.3, 5.24], // AGILUS 是快枪手
+    amax: [6.6, 6.3, 8.5, 11.8, 10.8, 13.1],
+    load: [35, 55, 40, 22, 18, 12],
+    temp: [36, 42, 37, 32, 30, 28],
+    current: [2.0, 3.0, 2.2, 1.1, 0.8, 0.5],
+    health: [90, 82, 88, 95, 97, 99],
+    rul: {},
+    fk: { baseH: 0.4, shoulderX: 0.025, upperArm: 0.455, forearm: 0.5 },
+    runtime: {
+      power_on_hours: 12300,
+      cycle_count: 85000,
+      last_maintenance_at: '2026-07-01T10:00:00+08:00',
     },
-  }
-}
+    extensions: () => ({
+      safety_gate_open: Math.random() > 0.8,
+      robroot_offset_x: +(Math.random() * 0.5).toFixed(3),
+      robroot_offset_y: +(Math.random() * 0.5).toFixed(3),
+      safety_controller_state: 'ACTIVE',
+      axis_soft_limit: '正常',
+    }),
+  },
+  {
+    brand: 'estun',
+    id: 'ESTUN_ER3A_001',
+    model: 'ER3A-C60',
+    // 码垛：进料位取 → 两个放料角轮流放，层数多了就这样跑
+    home: [0, 0.25, -0.4, 0, 0.15, 0],
+    program: [
+      { q: [0.9, 0.6, 0.4, 0, 0.3, 0.9], dwell: 0.5, v: 1.0 },
+      { q: [0.9, 0.35, 0.15, 0, 0.4, 0.9], dwell: 0.2, v: 0.7 },
+      { q: [0.45, 0.35, 0.15, 0, 0.4, 0.45], dwell: 0, v: 0.8 },
+      { q: [0.45, 0.7, 0.55, 0, 0.25, 0.45], dwell: 0.8, v: 0.4 },
+      { q: [0.45, 0.35, 0.15, 0, 0.4, 0.45], dwell: 0.2, v: 0.5 },
+      { q: [-0.45, 0.35, 0.15, 0, 0.4, -0.45], dwell: 0, v: 0.8 },
+      { q: [-0.45, 0.7, 0.55, 0, 0.25, -0.45], dwell: 0.8, v: 0.4 },
+      { q: [-0.45, 0.35, 0.15, 0, 0.4, -0.45], dwell: 0.2, v: 0.5 },
+      { q: [0, 0.25, -0.4, 0, 0.15, 0], dwell: 0, v: 0.9 },
+    ],
+    vmax: [2.1, 2.0, 2.6, 3.3, 3.0, 4.1],
+    amax: [5.2, 5.0, 6.5, 8.2, 7.5, 10.2],
+    load: [28, 42, 35, 20, 15, 10],
+    temp: [34, 39, 36, 31, 29, 27],
+    current: [1.5, 2.3, 1.9, 0.9, 0.6, 0.4],
+    health: [93, 85, 90, 96, 98, 99],
+    rul: {},
+    fk: { baseH: 0.391, shoulderX: 0.04, upperArm: 0.43, forearm: 0.525 },
+    runtime: {
+      power_on_hours: 5600,
+      cycle_count: 42000,
+    },
+    extensions: () => ({
+      energy_consumption: +(1.2 + Math.random() * 0.8).toFixed(2),
+      plc_extension: 'M1 Y0',
+      custom_alarm_word: 0,
+    }),
+  },
+  {
+    brand: 'yaskawa',
+    id: 'YASKAWA_GP7_001',
+    model: 'GP7-6L',
+    // 搬运 + 腕部翻转：转移过程中 J6 翻腕换向，放置姿态和抓取姿态不同
+    home: [0, 0.35, -0.6, 0, 0.25, 0],
+    program: [
+      { q: [0.8, 0.8, -1.1, 0, 0.4, 0.8], dwell: 0.6, v: 1.0 },
+      { q: [0.8, 0.55, -0.75, 0, 0.5, 0.8], dwell: 0.3, v: 0.65 },
+      { q: [-0.8, 0.55, -0.75, 0, 0.5, -2.3], dwell: 0, v: 0.8 },
+      { q: [-0.8, 0.8, -1.1, 0, 0.4, -2.3], dwell: 0.6, v: 0.5 },
+      { q: [-0.8, 0.55, -0.75, 0, 0.5, -0.8], dwell: 0.2, v: 0.65 },
+      { q: [0, 0.35, -0.6, 0, 0.25, 0], dwell: 0, v: 0.9 },
+    ],
+    vmax: [2.25, 2.1, 2.9, 3.75, 3.1, 4.6],
+    amax: [5.6, 5.2, 7.2, 9.4, 7.8, 11.5],
+    load: [33, 48, 38, 24, 16, 11],
+    temp: [35, 40, 37, 32, 30, 28],
+    current: [1.8, 2.6, 2.0, 1.0, 0.7, 0.5],
+    health: [92, 86, 90, 95, 97, 99],
+    rul: {},
+    fk: { baseH: 0.33, shoulderX: 0.04, upperArm: 0.445, forearm: 0.44 },
+    runtime: {
+      power_on_hours: 9800,
+      cycle_count: 76500,
+    },
+    extensions: () => ({
+      pulse_converter_status: '正常',
+      torch_alarm_word: 0,
+    }),
+  },
+]
 
-function mockEstunTelemetry() {
-  const now = new Date().toISOString()
-  const t = Date.now() / 1000
+const industrialSims = ROBOT_SIM_CFG.map((cfg) => new IndustrialRobotSim(cfg))
+
+// 组装一帧工业遥测（UDP 报文格式跟以前保持一致，前端适配器不用改）
+function buildIndustrialFrame(sim) {
+  const now = Date.now()
+  const s = sim.sample(now)
+  const c = sim.cfg
+  const joints = s.q.map((ang, i) => {
+    // 运动强度 0~1：负载/电流跟着它起伏，静下来就掉回基线
+    const motion = Math.min(1, Math.abs(s.w[i]) / c.vmax[i])
+    return {
+      j: i + 1,
+      angle_rad: +ang.toFixed(4),
+      load_pct: Math.round(c.load[i] * (0.97 + 0.06 * motion)),
+      temp_c: +sim.temp[i].toFixed(1),
+      current_a: +(c.current[i] * (0.55 + 0.75 * motion)).toFixed(1),
+      speed_rpm: Math.round((Math.abs(s.w[i]) * 60) / (2 * Math.PI)),
+      health_score: c.health[i],
+      rul_days: c.rul[i + 1],
+    }
+  })
   return {
     type: 'industrial_state',
-    brand: 'estun',
+    brand: c.brand,
     payload: {
-      robot_id: 'ESTUN_ER3A_001',
-      model: 'ER3A-C60',
-      timestamp: now,
-      pose: generateIndustrialPose(),
-      joints: [
-        { j: 1, angle_rad: Math.sin(t * 0.45) * 0.6, load_pct: 28, temp_c: 34, current_a: 1.5, speed_rpm: 90, health_score: 93 },
-        { j: 2, angle_rad: 0.15 + Math.sin(t * 0.65) * 0.4, load_pct: 42, temp_c: 39, current_a: 2.3, speed_rpm: 75, health_score: 85 },
-        { j: 3, angle_rad: -0.25 + Math.sin(t * 0.85) * 0.35, load_pct: 35, temp_c: 36, current_a: 1.9, speed_rpm: 100, health_score: 90 },
-        { j: 4, angle_rad: Math.sin(t * 1.05) * 0.45, load_pct: 20, temp_c: 31, current_a: 0.9, speed_rpm: 140, health_score: 96 },
-        { j: 5, angle_rad: Math.sin(t * 1.25) * 0.35, load_pct: 15, temp_c: 29, current_a: 0.6, speed_rpm: 170, health_score: 98 },
-        { j: 6, angle_rad: Math.sin(t * 1.45) * 0.3, load_pct: 10, temp_c: 27, current_a: 0.4, speed_rpm: 200, health_score: 99 },
-      ],
-      alarms: generateIndustrialAlarms('estun'),
-      runtime: {
-        power_on_hours: 5600,
-        cycle_count: 42000,
-      },
-      extensions: {
-        energy_consumption: +(1.2 + Math.random() * 0.8).toFixed(2),
-        plc_extension: 'M1 Y0',
-        custom_alarm_word: 0,
-      },
+      robot_id: c.id,
+      model: c.model,
+      timestamp: new Date(now).toISOString(),
+      status: s.status,
+      pose: approxFK(s.q, c.fk),
+      joints,
+      alarms: s.alarms,
+      runtime: { ...c.runtime, cycle_count: c.runtime.cycle_count + sim.cycles },
+      extensions: c.extensions(),
     },
   }
 }
 
 const wssIndustrial = new WebSocketServer({ port: 8082 })
-const industrialMocks = [mockFanucTelemetry, mockKukaTelemetry, mockEstunTelemetry]
 let industrialIdx = 0
 
 wssIndustrial.on('connection', (ws) => {
   console.log('[mock] Industrial client connected')
-  // 连接后立即推送一台
-  ws.send(JSON.stringify(industrialMocks[0]()))
+  // 连接后立即推一台
+  ws.send(JSON.stringify(buildIndustrialFrame(industrialSims[0])))
 })
 
-// 每 5 秒轮流推送一台工业机器人遥测
+// 125ms 轮流广播一台（每台 2Hz，总 8 帧/s）
+// 以前 5s 才轮一台，运动仿真需要密一点的采样才能看出梯形速度曲线
 setInterval(() => {
   if (wssIndustrial.clients.size === 0) return
-  industrialIdx = (industrialIdx + 1) % industrialMocks.length
-  const msg = industrialMocks[industrialIdx]()
-  const data = JSON.stringify(msg)
+  industrialIdx = (industrialIdx + 1) % industrialSims.length
+  const data = JSON.stringify(buildIndustrialFrame(industrialSims[industrialIdx]))
   wssIndustrial.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(data)
     }
   })
-}, 5000)
+}, 125)
 
 console.log('[mock] WS servers running:')
 console.log('  G1         → ws://localhost:8080  (8方向避障巡航)')
 console.log('  Peanut     → ws://localhost:8081')
-console.log('  Industrial → ws://localhost:8082  (FANUC/KUKA/埃斯顿 轮流)')
+console.log('  Industrial → ws://localhost:8082  (4品牌关节插补运动仿真, 2Hz/台)')
 console.log(`[mock] 栅格地图: ${GRID.cols}x${GRID.rows}  世界范围 X: [${GRID_OX}, ${GRID_OX + GRID.cols * GRID.cellSize}]  Z: [${GRID_OZ}, ${GRID_OZ + GRID.rows * GRID.cellSize}]`)
 
 // 2026-08-21 OTA mock 广播：模拟 ota-agent 上报状态到 MQTT broker

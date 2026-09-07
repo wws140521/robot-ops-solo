@@ -1,12 +1,13 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Grid, ContactShadows, AdaptiveDpr, AdaptiveEvents } from '@react-three/drei'
-import { memo, useRef, useState } from 'react'
+import { memo, useRef, useState, useEffect } from 'react'
 import { G1Humanoid } from './robots/G1Humanoid'
 import { PeanutBot } from './robots/PeanutBot'
 import { FanucArm } from './robots/FanucArm'
 import { KukaArm } from './robots/KukaArm'
 import { IndustrialRobotModel } from './robots/IndustrialRobotModel'
-import { Floor } from './environment/Floor'
+import { Floor, ConcreteFloor } from './environment/Floor'
+import { IndustrialPedestal, PEDESTAL_HEIGHT } from './environment/IndustrialPedestal'
 import { SceneAssets } from './environment/SceneAssets'
 import { isIndustrialBrand } from './config/industrial-models'
 
@@ -35,6 +36,9 @@ export function RobotViewer({ state, showMap = true }: RobotViewerProps) {
   if (effectiveState) hasEverHadStateRef.current = true
   const shouldRenderRobot = effectiveState || hasEverHadStateRef.current
 
+  // 工业设备用车间场景（混凝土地坪+基座），商用设备维持原来的光洁地面
+  const industrial = isIndustrialBrand(effectiveState?.brand)
+
   return (
     <div
       style={{
@@ -58,7 +62,7 @@ export function RobotViewer({ state, showMap = true }: RobotViewerProps) {
 
         {/* 2026-08-28 静态场景元素 memo 化：灯光/地面/网格/阴影/墙体仅依赖 palette+showMap，
             避免 WS 高频帧（~10Hz）触发重建导致网格几何重绘闪烁 */}
-        <SceneEnvironment palette={palette} showMap={showMap} />
+        <SceneEnvironment palette={palette} showMap={showMap} industrial={industrial} />
 
         {/* 机器人 —— 始终挂载，G1Model 内部用 useRef 管理加载状态，不会因短暂 falsy 卸载 */}
         {shouldRenderRobot && (
@@ -104,9 +108,11 @@ export function RobotViewer({ state, showMap = true }: RobotViewerProps) {
 const SceneEnvironment = memo(function SceneEnvironment({
   palette,
   showMap,
+  industrial,
 }: {
   palette: ReturnType<typeof useScenePalette>
   showMap: boolean
+  industrial: boolean
 }) {
   return (
     <>
@@ -144,26 +150,35 @@ const SceneEnvironment = memo(function SceneEnvironment({
         decay={2}
       />
 
-      {/* 2026-08-28 Floor 升级 MeshReflectorMaterial，反射强度 1.2 提供金属质感 */}
-      <Floor color={palette.floor} reflectivity={0} />
+      {/* 地面：工业设备铺混凝土地坪（自带伸缩缝网格），
+          商用设备保持原来的光洁地面 + 细网格 */}
+      {industrial ? (
+        <ConcreteFloor palette={palette} />
+      ) : (
+        <>
+          {/* 2026-08-28 Floor 升级 MeshReflectorMaterial，反射强度 1.2 提供金属质感 */}
+          <Floor color={palette.floor} reflectivity={0} />
 
-      {/* 2026-08-28 Grid 抬升 0.005 + 移除 infiniteGrid + 降低线宽 → 消除鼠标拖拽时网格闪烁 */}
-      <group position={[0, 0.005, 0]}>
-        <Grid
-          args={[28, 28]}
-          cellSize={0.5}
-          cellThickness={0.08}
-          cellColor={palette.gridCell}
-          sectionSize={2}
-          sectionThickness={0.15}
-          sectionColor={palette.gridSection}
-          fadeDistance={24}
-          fadeStrength={1.5}
-          infiniteGrid={false}
-        />
-      </group>
+          {/* 2026-08-28 Grid 抬升 0.005 + 移除 infiniteGrid + 降低线宽 → 消除鼠标拖拽时网格闪烁 */}
+          <group position={[0, 0.005, 0]}>
+            <Grid
+              args={[28, 28]}
+              cellSize={0.5}
+              cellThickness={0.08}
+              cellColor={palette.gridCell}
+              sectionSize={2}
+              sectionThickness={0.15}
+              sectionColor={palette.gridSection}
+              fadeDistance={24}
+              fadeStrength={1.5}
+              infiniteGrid={false}
+            />
+          </group>
+        </>
+      )}
 
-      {showMap && (
+      {/* 充电桩和安全标线是商用机器人场景的道具，车间里不需要 */}
+      {showMap && !industrial && (
         <SceneAssets palette={palette} />
       )}
 
@@ -181,9 +196,22 @@ const SceneEnvironment = memo(function SceneEnvironment({
 })
 
 function RobotBody({ state, visible = true }: { state: UnifiedRobotState; visible?: boolean }) {
-  const pos: [number, number, number] = [state.position.x, 0, state.position.y]
-  const rot: [number, number, number] = [0, state.position.theta, 0]
+  // 工业臂的 state.position 是 TCP 末端位姿（毫米级，±500 范围），
+  // 不是基座世界坐标——拿来摆放模型会直接飞出相机视野，所以固定放原点；
+  // y 抬到 PEDESTAL_HEIGHT，让基座正好落在钢底板顶面上
+  const industrial = isIndustrialBrand(state.brand)
+  const pos: [number, number, number] = industrial
+    ? [0, PEDESTAL_HEIGHT, 0]
+    : [state.position.x, 0, state.position.y]
+  const rot: [number, number, number] = industrial
+    ? [0, 0, 0]
+    : [0, state.position.theta, 0]
   const [urdfFailed, setUrdfFailed] = useState(false)
+
+  // 切换品牌时重置 urdfFailed，不然上一台加载失败的状态会残留到下一台
+  useEffect(() => {
+    setUrdfFailed(false)
+  }, [state.brand])
 
   // 工业关节遥测，统一从 state.industrial?.joints 读取
   const industrialJoints = state.industrial?.joints ?? []
@@ -193,12 +221,16 @@ function RobotBody({ state, visible = true }: { state: UnifiedRobotState; visibl
       {state.brand === 'unitree' && <G1Humanoid position={pos} rotation={rot} scale={1.0} />}
       {state.brand === 'keenon' && <PeanutBot position={pos} rotation={rot} />}
 
+      {/* 螺栓底座：混凝土基墩+钢底板，URDF 和降级机械臂都站在上面 */}
+      {industrial && <IndustrialPedestal />}
+
       {isIndustrialBrand(state.brand) && !urdfFailed && (
         <IndustrialRobotModel
           brand={state.brand}
           position={pos}
           rotation={rot}
           joints={industrialJoints}
+          visible={visible}
           onLoadError={(err) => {
             console.warn(`[RobotViewer] ${state.brand} 真实模型加载失败，降级到程序化机械臂:`, err.message)
             setUrdfFailed(true)

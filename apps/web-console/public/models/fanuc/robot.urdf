@@ -1,177 +1,114 @@
 <?xml version="1.0"?>
-<robot name="fanuc_m20id">
+<!-- FANUC M-20iA 官方模型：STL 和关节参数来自 ros-industrial/fanuc (fanuc_m20ia_support) -->
+<!-- Z-up 米制，加载时需要 convertToYUp -->
+<robot name="fanuc_m20ia">
 
-  <material name="fanuc_orange">
-    <color rgba="1.0 0.4 0.0 1.0"/>
-  </material>
-  <material name="fanuc_dark">
-    <color rgba="0.1 0.1 0.1 1.0"/>
-  </material>
+  <material name="fanuc_yellow"><color rgba="0.96 0.76 0.13 1.0"/></material>
+  <material name="fanuc_gray28"><color rgba="0.278 0.278 0.278 1.0"/></material>
+  <material name="fanuc_black"><color rgba="0.15 0.15 0.15 1.0"/></material>
 
-  <!-- base link (底座) -->
-  <link name="base">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="20.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="base_link">
     <visual>
-      <origin xyz="0 0 0.1375"/>
-      <geometry>
-        <mesh filename="package://fanuc_support/meshes/base_link.STL"/>
-      </geometry>
-      <material name="fanuc_dark"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://fanuc_support/meshes/base_link.stl"/></geometry>
+      <material name="fanuc_gray28"/>
     </visual>
   </link>
 
-  <!-- j1 link (腰部/立柱) -->
-  <link name="j1">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="10.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_1">
     <visual>
-      <origin xyz="0 0 -0.075"/>
-      <geometry>
-        <mesh filename="package://fanuc_support/meshes/j1_link.STL"/>
-      </geometry>
-      <material name="fanuc_orange"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://fanuc_support/meshes/link_1.stl"/></geometry>
+      <material name="fanuc_yellow"/>
     </visual>
   </link>
 
-  <!-- j2 link (大臂) -->
-  <link name="j2">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="12.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_2">
     <visual>
-      <origin xyz="0 0 -0.175"/>
-      <geometry>
-        <mesh filename="package://fanuc_support/meshes/j2_link.STL"/>
-      </geometry>
-      <material name="fanuc_orange"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://fanuc_support/meshes/link_2.stl"/></geometry>
+      <material name="fanuc_yellow"/>
     </visual>
   </link>
 
-  <!-- j3 link (小臂) -->
-  <link name="j3">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="8.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_3">
     <visual>
-      <origin xyz="0 0 -0.125"/>
-      <geometry>
-        <mesh filename="package://fanuc_support/meshes/j3_link.STL"/>
-      </geometry>
-      <material name="fanuc_orange"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://fanuc_support/meshes/link_3.stl"/></geometry>
+      <material name="fanuc_yellow"/>
     </visual>
   </link>
 
-  <!-- j4 link (腕1) -->
-  <link name="j4">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="4.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_4">
     <visual>
-      <origin xyz="0 0 -0.06"/>
-      <geometry>
-        <mesh filename="package://fanuc_support/meshes/j4_link.STL"/>
-      </geometry>
-      <material name="fanuc_orange"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://fanuc_support/meshes/link_4.stl"/></geometry>
+      <material name="fanuc_yellow"/>
     </visual>
   </link>
 
-  <!-- j5 link (腕2) -->
-  <link name="j5">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="2.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_5">
     <visual>
-      <origin xyz="0 0 -0.05"/>
-      <geometry>
-        <mesh filename="package://fanuc_support/meshes/j5_link.STL"/>
-      </geometry>
-      <material name="fanuc_orange"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://fanuc_support/meshes/link_5.stl"/></geometry>
+      <material name="fanuc_yellow"/>
     </visual>
   </link>
 
-  <!-- j6 link (末端法兰) -->
-  <link name="j6">
-    <inertial>
-      <origin xyz="0 0 0"/>
-      <mass value="1.0"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
-    </inertial>
+  <link name="link_6">
     <visual>
-      <origin xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="package://fanuc_support/meshes/j6_link.STL"/>
-      </geometry>
-      <material name="fanuc_orange"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="package://fanuc_support/meshes/link_6.stl"/></geometry>
+      <material name="fanuc_black"/>
     </visual>
   </link>
 
-  <!-- base -> j1 腰部旋转，绕Y轴 -->
   <joint name="joint_1" type="revolute">
-    <origin xyz="0 0 0.275" rpy="0 0 0"/>
-    <parent link="base"/>
-    <child link="j1"/>
-    <axis xyz="0 1 0"/>
-    <limit lower="-2.967059728" upper="2.967059728" effort="100" velocity="3.14"/>
+    <origin xyz="0 0 0.525" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="link_1"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-2.967060" upper="2.967060" effort="100" velocity="3.403392"/>
   </joint>
 
-  <!-- j1 -> j2 大臂摆动，绕X轴 -->
   <joint name="joint_2" type="revolute">
-    <origin xyz="0 0 -0.15" rpy="0 0 0"/>
-    <parent link="j1"/>
-    <child link="j2"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-1.570796327" upper="2.617993878" effort="100" velocity="2.094"/>
-  </joint>
-
-  <!-- j2 -> j3 小臂摆动，绕X轴 -->
-  <joint name="joint_3" type="revolute">
-    <origin xyz="0 0 -0.35" rpy="0 0 0"/>
-    <parent link="j2"/>
-    <child link="j3"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-2.617993878" upper="1.570796327" effort="100" velocity="2.094"/>
-  </joint>
-
-  <!-- j3 -> j4 腕1 旋转，绕X轴 -->
-  <joint name="joint_4" type="revolute">
-    <origin xyz="0 0 -0.25" rpy="0 0 0"/>
-    <parent link="j3"/>
-    <child link="j4"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-3.839724354" upper="3.839724354" effort="50" velocity="4.189"/>
-  </joint>
-
-  <!-- j4 -> j5 腕2 摆动，绕Y轴 -->
-  <joint name="joint_5" type="revolute">
-    <origin xyz="0 0 -0.12" rpy="0 0 0"/>
-    <parent link="j4"/>
-    <child link="j5"/>
+    <origin xyz="0.150 0 0" rpy="0 0 0"/>
+    <parent link="link_1"/>
+    <child link="link_2"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-2.443460953" upper="2.443460953" effort="50" velocity="3.141"/>
+    <limit lower="-1.745329" upper="2.792527" effort="100" velocity="3.054326"/>
   </joint>
 
-  <!-- j5 -> j6 末端旋转，绕X轴 -->
+  <joint name="joint_3" type="revolute">
+    <origin xyz="0 0 0.790" rpy="0 0 0"/>
+    <parent link="link_2"/>
+    <child link="link_3"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-3.228859" upper="4.766843" effort="100" velocity="3.141593"/>
+  </joint>
+
+  <joint name="joint_4" type="revolute">
+    <origin xyz="0 0 0.250" rpy="0 0 0"/>
+    <parent link="link_3"/>
+    <child link="link_4"/>
+    <axis xyz="-1 0 0"/>
+    <limit lower="-3.490658" upper="3.490658" effort="50" velocity="6.283185"/>
+  </joint>
+
+  <joint name="joint_5" type="revolute">
+    <origin xyz="0.835 0 0" rpy="0 0 0"/>
+    <parent link="link_4"/>
+    <child link="link_5"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-2.443461" upper="2.443461" effort="50" velocity="6.283185"/>
+  </joint>
+
   <joint name="joint_6" type="revolute">
-    <origin xyz="0 0 -0.10" rpy="0 0 0"/>
-    <parent link="j5"/>
-    <child link="j6"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-6.283185307" upper="6.283185307" effort="30" velocity="6.283"/>
+    <origin xyz="0.100 0 0" rpy="0 0 0"/>
+    <parent link="link_5"/>
+    <child link="link_6"/>
+    <axis xyz="-1 0 0"/>
+    <limit lower="-4.712389" upper="4.712389" effort="30" velocity="9.599311"/>
   </joint>
 
 </robot>
