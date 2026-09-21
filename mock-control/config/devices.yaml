@@ -1,0 +1,60 @@
+# mock-control/config/devices.yaml
+# 设备清单：robotId 必须与 mock-ws-server.js 的仿真器 ID 一致（否则指令路由不到）
+# 商用机器人走 :8080/:8081，工业机械臂走 :8082
+
+devices:
+  # ── 商用机器人 ──
+  - robotId: UNITREE-G1-01
+    name: 宇树 G1 人形 #1
+    brand: unitree
+    deviceClass: ground_robot
+    wsPort: 8080
+    initialStatus: moving
+    initialBattery: 85
+    initialHealth: 88
+
+  - robotId: KEENON-T9-01
+    name: 擎朗 Peanut 递送 #1
+    brand: keenon
+    deviceClass: ground_robot
+    wsPort: 8081
+    initialStatus: moving
+    initialBattery: 92
+    initialHealth: 95
+
+  # ── 工业机械臂（ID 对齐 mock-ws-server.js ROBOT_SIM_CFG.id）──
+  - robotId: FANUC_M20iD_001
+    name: FANUC M-20iD/25 #1
+    brand: fanuc
+    deviceClass: industrial_arm
+    wsPort: 8082
+    initialStatus: working
+    initialBattery: null
+    initialHealth: 72
+
+  - robotId: KUKA_KR6_001
+    name: KUKA KR 6 R900 #1
+    brand: kuka
+    deviceClass: industrial_arm
+    wsPort: 8082
+    initialStatus: working
+    initialBattery: null
+    initialHealth: 80
+
+  - robotId: ESTUN_ER3A_001
+    name: 埃斯顿 ER3A-C60 #1
+    brand: estun
+    deviceClass: industrial_arm
+    wsPort: 8082
+    initialStatus: idle
+    initialBattery: null
+    initialHealth: 90
+
+  - robotId: YASKAWA_GP7_001
+    name: 安川 GP7-6L #1
+    brand: yaskawa
+    deviceClass: industrial_arm
+    wsPort: 8082
+    initialStatus: working
+    initialBattery: null
+    initialHealth: 55

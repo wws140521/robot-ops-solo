@@ -1,6 +1,6 @@
 // 2026-08-21 创建 OTA 管理页，实现设备升级控制+进度展示+前置校验+日志
 // 对应《前端开发文档》第 7 节 UI 结构 + 第 9 节容错优化
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import { GlassCard, NeonBadge, StatusDot } from 'ui-kit'
 import { useOtaStore, triggerMockFail, type OtaState } from '../stores/otaStore'
 import { useRobotStore } from '../stores/robotStore'
@@ -254,11 +254,12 @@ function OtaLogList() {
 
 // OTA 升级管理页：设备卡片 + 批量升级 + 日志
 export function OtaPage() {
-  const robots = useRobotStore((s) => s.robots)
+  // 2026-09-09 订阅 id 签名（原始值）：设备集合不变时遥测更新不再重渲染本页，
+  // OTA 状态本身走 useOtaStore（低频事件驱动）
+  const robotIdSig = useRobotStore((s) => Object.keys(s.robots).join('\u0000'))
+  const robotIds = robotIdSig === '' ? [] : robotIdSig.split('\u0000')
   const statuses = useOtaStore((s) => s.statuses)
   const availableVersion = useOtaStore((s) => s.availableVersion)
-
-  const robotIds = Object.keys(robots)
   const activeCount = Object.values(statuses).filter(
     (s) => ['pending', 'downloading', 'upgrading'].includes(s.state)
   ).length

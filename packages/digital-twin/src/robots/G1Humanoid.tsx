@@ -56,7 +56,8 @@ const g1Anchor = new THREE.Group()
 g1Anchor.name = '__G1_ANCHOR__'
 // 暴露到 window 便于调试
 ;(window as unknown as Record<string, unknown>).__g1Anchor = g1Anchor
-let g1AnchorInScene = false       // 是否已加入 R3F scene
+// 2026-09-09 g1AnchorInScene flag 已移除：跨 Canvas 导航时 flag 与实际 scene 脱钩，
+// 改为挂载 effect 里按 g1Anchor.parent !== scene 实际判断
 let g1RobotAddedToAnchor = false  // 机器人是否已加入 anchor
 
 // ═══════════════════════════════════════════════════════════
@@ -253,6 +254,7 @@ function G1Model({ position, rotation, scale, onLoaded, onError }: G1ModelProps)
     // 转向状态机：只驱动腿部交叉步样式，不再冻结位置/锁存航向
     // （mock 是边走边转的弧线运动，冻结后退出瞬移 0.5m+，肉眼就是抽搐）
     turnState: 'walking' as 'walking' | 'turning',
+    turnBlend: 0,      // 交叉步混合系数 0~1（0.25s 时间常数渐变，防步态硬切跳变）
   })
 
   // 保持最新的 position / rotation 引用供 useFrame 访问
@@ -297,10 +299,14 @@ function G1Model({ position, rotation, scale, onLoaded, onError }: G1ModelProps)
       scene.remove(old)
       console.log('[G1Model] HMR: 移除旧 anchor')
     }
-    if (!g1AnchorInScene) {
+    // 2026-09-09 修复跨视图导航后 G1 永久消失：原模块级 flag（g1AnchorInScene）
+    // 在舰队↔单机切换时新 Canvas 的新 scene 里仍为 true，导致永远不再 add，
+    // anchor 一直挂在已销毁的旧 scene 上——G1 从此不可见，只能整页刷新。
+    // 改为按「当前 scene 实际持有」判断：Object3D.add 会先把 anchor 从旧 parent
+    // 摘下来再挂到新 scene，跨 Canvas 重挂天然安全（与 PeanutBot 同一模式）。
+    if (g1Anchor.parent !== scene) {
       scene.add(g1Anchor)
-      g1AnchorInScene = true
-      console.log('[G1Model] 永久 anchor 已加入 R3F scene')
+      console.log('[G1Model] anchor 已加入当前 scene（首次挂载/跨视图导航重挂）')
     }
     // 挂载时确保可见（可能刚从别的设备切回来）
     g1Anchor.visible = true
@@ -332,6 +338,12 @@ function G1Model({ position, rotation, scale, onLoaded, onError }: G1ModelProps)
           ;(window as unknown as Record<string, unknown>).__g1Robot = cachedG1Robot
           if (cachedG1L1Passed) {
             cachedG1Robot.updateMatrixWorld(true)
+            // 2026-09-09 修复切路由回来后 G1 冻结（模型不动、HUD 却跟着遥测走）：
+            // l1MeasuredRef 是组件级 ref，useFrame 靠它放行位置/步态同步；
+            // 首次加载经 performL1Validation 置 true，但本缓存命中路径原来漏了这步，
+            // 重挂后每帧都在守卫处 return，anchor 永远停在旧位置。
+            // L1 首次已通过（cachedG1L1Passed），直接放行。
+            l1MeasuredRef.current = true
           }
           return
         }
@@ -599,6 +611,12 @@ function G1Model({ position, rotation, scale, onLoaded, onError }: G1ModelProps)
       g.turnState = 'walking'
     }
 
+    // 2026-09-08 turnBlend 平滑：交叉步与直行步态之间 0.25s 时间常数渐变。
+    // 之前 0/1 硬切换，进出急转那一帧 hipYaw 0→0.70 / pitchAmp 0.9→0.3 瞬间跳变，
+    // 髋膝肉眼可见「弹跳」。渐变后交叉步是「长出来/收回去」的。
+    const targetTurnBlend = g.turnState === 'turning' ? 1 : 0
+    g.turnBlend += (targetTurnBlend - g.turnBlend) * clamp(dt / 0.25, 0, 1)
+
     // 转向 anticipation 用：实际旋转角速度 + 当前航向偏差
     const headingChange = Math.abs(wrapAngle(g.smoothedTheta - g.prevTheta))
     g.yawVel = headingChange / Math.max(dt, 0.001)
@@ -621,8 +639,8 @@ function G1Model({ position, rotation, scale, onLoaded, onError }: G1ModelProps)
     g.emaFrameVel += (speed - g.emaFrameVel) * clamp(dt / 0.15, 0, 1)
     g.emaFrameVel = clamp(g.emaFrameVel, 0, 1.2)
     const walkFreq = stepFrequency(g.emaFrameVel, PARAMS.stepLength)
-    // 急转（交叉步）时保底 0.4Hz 原地踏步节奏
-    const baseFreq = g.turnState === 'turning' ? Math.max(walkFreq, 0.4) : walkFreq
+    // 急转（交叉步）时保底 0.4Hz 踏步节奏（按 turnBlend 渐变，不硬切）
+    const baseFreq = Math.max(walkFreq, 0.4 * g.turnBlend)
     const turnBoost = clamp(g.yawVel * 0.12, 0, 0.25)
     const targetFreq = baseFreq + turnBoost
 
@@ -675,13 +693,14 @@ function G1Model({ position, rotation, scale, onLoaded, onError }: G1ModelProps)
 
     // ── 转向 anticipation（文档 §5.2：内侧腿缩短、外侧腿加长） ──
     const turnFactor = clamp(g.turnAmount / 0.6, 0, 1)  // 0 ~ 1
-    // headingError 已在上面被 wrapAngle 处理过（±π），sign 告诉我们往哪边转
-    const turnSign = headingError > 0 ? 1 : -1
 
     // turning 状态：用侧向交叉步，hipPitch 减半、hipYaw/hipRoll 加大，
     // 让视觉上明显在原地转身，而不是前后踏步。
-    const turnBlend = g.turnState === 'turning' ? 1 : 0
+    // turnBlend 见上方平滑注释；转向倾向用 headingError 连续函数（饱和到 ±1），
+    // 误差过零/反向时偏置连续过渡，不会像 sign() 那样瞬间翻转。
+    const turnBlend = g.turnBlend
     const walkBlend = 1 - turnBlend
+    const turnSign = clamp(headingError * 2, -1, 1)
 
     // 基础前后迈步振幅（walking 正常，turning 大幅降低）
     const pitchAmp = pitchAmpBase * legAmp * (0.9 * walkBlend + 0.3 * turnBlend)

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mock 控制面板 · Robot-Ops-Solo</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>" />
+  <link rel="stylesheet" href="css/control-panel.css" />
+</head>
+<body>
+
+  <!-- ═══════════ 顶栏 ═══════════ -->
+  <header class="topbar">
+    <div class="topbar__title">
+      <span class="topbar__icon">🎮</span>
+      <h1>Mock 控制面板 <small>Robot-Ops-Solo</small></h1>
+    </div>
+    <div class="topbar__status">
+      <span id="transport-mode" class="transport-chip">连接中…</span>
+      <span id="conn-dot" class="status-dot status-dot--offline" title="SSE 连接状态"></span>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <!-- ═══════════ 场景剧本 ═══════════ -->
+    <section class="panel panel--scenario">
+      <div class="panel__header">场景剧本</div>
+      <div class="panel__body">
+        <div id="scenario-buttons" class="scenario-buttons">
+          <!-- JS 按 /api/scenario 渲染 -->
+        </div>
+        <div id="scenario-progress-wrap" class="scenario-progress" hidden>
+          <div class="scenario-progress__bar">
+            <div id="scenario-progress-fill" class="scenario-progress__fill"></div>
+          </div>
+          <div id="scenario-progress-text" class="scenario-progress__text">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ 设备网格 ═══════════ -->
+    <section class="panel panel--grid">
+      <div class="panel__header">设备网格 <span id="device-count" class="panel__hint"></span></div>
+      <div class="panel__body">
+        <div id="device-grid" class="device-grid">
+          <!-- JS 渲染设备卡片 -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ 控制面板（选中设备）═══════════ -->
+    <section class="panel panel--control">
+      <div class="panel__header">
+        控制面板
+        <span id="control-target" class="panel__hint">未选择设备（点击上方卡片）</span>
+      </div>
+      <div class="panel__body">
+        <div id="control-empty" class="control-empty">
+          点击设备网格中的卡片，开始对该设备下发指令
+        </div>
+
+        <div id="control-body" hidden>
+          <!-- 生命周期 -->
+          <div class="control-group">
+            <div class="control-group__label">生命周期</div>
+            <div class="btn-row">
+              <button class="btn" data-action="start"  title="启动 / 恢复生产">▶ 启动</button>
+              <button class="btn" data-action="pause"  title="暂停（设备空闲）">⏸ 暂停</button>
+              <button class="btn" data-action="stop"   title="停止">⏹ 停止</button>
+              <button class="btn" data-action="resume" title="恢复运行">⏵ 恢复</button>
+              <button class="btn" data-action="reset"  title="复位到初始状态">↺ 复位</button>
+            </div>
+          </div>
+
+          <!-- 电量（商用设备） -->
+          <div class="control-group" id="group-battery">
+            <div class="control-group__label">电量 <span id="battery-value" class="value-chip">—</span></div>
+            <input type="range" min="0" max="100" step="1" value="85" data-param="battery" />
+          </div>
+
+          <!-- 关节温度（工业设备） -->
+          <div class="control-group" id="group-joints">
+            <div class="control-group__label">关节温度（调高会联动健康分）</div>
+            <div id="joint-sliders" class="joint-sliders">
+              <!-- J1~J6 滑块 JS 渲染 -->
+            </div>
+          </div>
+
+          <!-- 告警（工业设备） -->
+          <div class="control-group" id="group-alarms">
+            <div class="control-group__label">告警</div>
+            <div class="btn-row">
+              <select id="alarm-code" class="select">
+                <option value="SRVO-023">SRVO-023 伺服过载</option>
+                <option value="SRVO-001">SRVO-001 伺服过流</option>
+                <option value="OH-002">OH-002 变频器过热</option>
+                <option value="KSS-150">KSS-150 伺服过载</option>
+                <option value="EST-3008">EST-3008 编码器异常</option>
+                <option value="ALM-201">ALM-201 绝对位置丢失</option>
+              </select>
+              <select id="alarm-severity" class="select select--narrow">
+                <option value="warn">warn</option>
+                <option value="error">error</option>
+                <option value="info">info</option>
+              </select>
+              <button class="btn btn--warn" data-action="trigger_alarm">⚠️ 触发</button>
+              <button class="btn" data-action="clear_alarm">🧹 清空全部</button>
+            </div>
+            <div id="active-alarms" class="active-alarms">
+              <!-- 当前活动告警标签 -->
+            </div>
+          </div>
+
+          <!-- 高级 -->
+          <div class="control-group">
+            <div class="control-group__label">高级</div>
+            <div class="btn-row">
+              <button class="btn" data-action="simulate_offline" data-duration="30000">📡 模拟离线 30s</button>
+              <button class="btn" data-action="inject_fault" data-fault="servo_overheat">💉 注入故障</button>
+              <button class="btn" data-action="set_mode" data-mode="manual">🎮 手动模式</button>
+              <button class="btn" data-action="set_mode" data-mode="auto">🤖 自动模式</button>
+              <button class="btn" data-action="custom_telemetry" title='例: {"status":"charging","battery":66} · 可覆盖 name/status/battery/healthScore/mode/online/position/heading'>🎯 自定义 telemetry</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ 实时日志 ═══════════ -->
+    <section class="panel panel--log">
+      <div class="panel__header">
+        实时日志
+        <button id="log-clear" class="btn btn--ghost btn--small">清空</button>
+      </div>
+      <div class="panel__body">
+        <div id="log-list" class="log-list"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "name": "mock-control",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Mock 操作页面 · 路演 Demo 双向控制服务（设备网格 + 指令下发 + 场景剧本）",
+  "scripts": {
+    "dev": "node server/index.js",
+    "start": "node server/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "mqtt": "^5.10.1",
+    "ws": "^8.18.0",
+    "yaml": "^2.5.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}

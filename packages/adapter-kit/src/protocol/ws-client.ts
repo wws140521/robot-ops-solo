@@ -5,7 +5,9 @@ export class RobotWSClient {
   private reconnectTimer?: number
   private heartbeatTimer?: number
   private reconnectAttempts = 0
-  private readonly maxReconnect = 10
+  // 2026-09-09 10 次（约 3 分钟）后放弃对路演不够稳：mock 服务中途重启超过窗口就永久断连，
+  // 提到 30 次（约 15 分钟，退避封顶 30s）覆盖整个演示时段
+  private readonly maxReconnect = 30
   // 2026-08-28 主动断开标志：disconnect() 后 onclose 仍会触发，
   // 若不拦截会 scheduleReconnect 复活孤儿连接 → mock 端状态被多连接加速推进（电量 5 倍速递减实测）
   private disposed = false

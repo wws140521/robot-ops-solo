@@ -280,6 +280,29 @@
   font-family: var(--font-mono);
 }
 
+/* 告警→3D 联动：hover 时浮出「3D 定位」提示，点击条目跳孪生页相机飞行 */
+.alerts-card-locate {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 10px;
+  padding: 2px 8px;
+  border: 1px solid var(--status-error);
+  border-radius: var(--radius-sm);
+  color: var(--status-error);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  opacity: 0;
+  transform: translateX(4px);
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  white-space: nowrap;
+}
+
+.alerts-card:hover .alerts-card-locate {
+  opacity: 1;
+  transform: translateX(0);
+}
+
 .alerts-card-message {
   font-size: 13px;
   color: var(--text-secondary);

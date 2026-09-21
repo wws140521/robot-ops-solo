@@ -1,0 +1,119 @@
+<?xml version="1.0"?>
+<!--
+  Keenon Peanut 送餐机器人 URDF（peanut-001）— STL mesh 版
+  结构：底盘 + 防撞圈 + 双层托盘 + 立柱 + 头部屏 + 导航灯，全部固定关节（送餐机无关节遥测）
+  几何：meshes/*.stl 由 packages/digital-twin/scripts/generate-peanut-stl.mjs 程序化生成
+        （Keenon 无公开 STL 仓库，按真机造型生成；ROS z-up 约定，走与工业臂相同的
+        three-urdf convertToYUp + packageMap 管线）
+  尺寸与原内联 box 版逐件一致（origin xyz 全部未动，底盘底面离地 0.07m 不变）
+-->
+<robot name="keenon_peanut">
+
+  <!-- 材质定义（rgba） -->
+  <material name="orange">
+    <color rgba="1.0 0.478 0.094 1.0"/>
+  </material>
+  <material name="cream">
+    <color rgba="1.0 0.953 0.878 1.0"/>
+  </material>
+  <material name="dark">
+    <color rgba="0.063 0.090 0.145 1.0"/>
+  </material>
+  <material name="navlight">
+    <color rgba="1.0 0.878 0.510 1.0"/>
+  </material>
+
+  <!-- 底盘：橙色圆角回转体（r=0.30，高 0.3） -->
+  <link name="base">
+    <visual>
+      <origin xyz="0 0 0.22" rpy="0 0 0"/>
+      <geometry><mesh filename="package://peanut_support/meshes/base.stl"/></geometry>
+      <material name="orange"/>
+    </visual>
+  </link>
+
+  <!-- 防撞圈：底盘底部深色橡胶环（真机特征件） -->
+  <link name="bumper">
+    <visual>
+      <origin xyz="0 0 0.13" rpy="0 0 0"/>
+      <geometry><mesh filename="package://peanut_support/meshes/bumper.stl"/></geometry>
+      <material name="dark"/>
+    </visual>
+  </link>
+  <joint name="base_to_bumper" type="fixed">
+    <parent link="base"/>
+    <child link="bumper"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- 下托盘：奶油色圆盘带沿口（上下层共用 tray.stl） -->
+  <link name="lower_tray">
+    <visual>
+      <origin xyz="0 0 0.42" rpy="0 0 0"/>
+      <geometry><mesh filename="package://peanut_support/meshes/tray.stl"/></geometry>
+      <material name="cream"/>
+    </visual>
+  </link>
+  <joint name="base_to_lower_tray" type="fixed">
+    <parent link="base"/>
+    <child link="lower_tray"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- 立柱：橙色锥形柱（r 0.065→0.055） -->
+  <link name="column">
+    <visual>
+      <origin xyz="0 0 0.7" rpy="0 0 0"/>
+      <geometry><mesh filename="package://peanut_support/meshes/column.stl"/></geometry>
+      <material name="orange"/>
+    </visual>
+  </link>
+  <joint name="base_to_column" type="fixed">
+    <parent link="base"/>
+    <child link="column"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- 上托盘 -->
+  <link name="upper_tray">
+    <visual>
+      <origin xyz="0 0 0.99" rpy="0 0 0"/>
+      <geometry><mesh filename="package://peanut_support/meshes/tray.stl"/></geometry>
+      <material name="cream"/>
+    </visual>
+  </link>
+  <joint name="column_to_upper_tray" type="fixed">
+    <parent link="column"/>
+    <child link="upper_tray"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- 头部：深色圆润舱（加载后叠 emissive 蓝光，见 PeanutBot.tsx 遍历） -->
+  <link name="head">
+    <visual>
+      <origin xyz="0 0 1.24" rpy="0 0 0"/>
+      <geometry><mesh filename="package://peanut_support/meshes/head.stl"/></geometry>
+      <material name="dark"/>
+    </visual>
+  </link>
+  <joint name="column_to_head" type="fixed">
+    <parent link="column"/>
+    <child link="head"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- 导航灯：暖黄小球（加载后叠 emissive，位置对齐原占位模型局部 +Z 前向） -->
+  <link name="nav_light">
+    <visual>
+      <origin xyz="0 -0.3 0.4" rpy="0 0 0"/>
+      <geometry><mesh filename="package://peanut_support/meshes/nav_light.stl"/></geometry>
+      <material name="navlight"/>
+    </visual>
+  </link>
+  <joint name="base_to_nav_light" type="fixed">
+    <parent link="base"/>
+    <child link="nav_light"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+</robot>

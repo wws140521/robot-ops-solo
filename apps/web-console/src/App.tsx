@@ -11,12 +11,14 @@ import { TwinPage } from './routes/TwinPage'
 import { AlertsPage } from './routes/AlertsPage'
 import { TenantsPage } from './routes/TenantsPage'
 import { OtaPage } from './routes/OtaPage'
-import { FleetMapPage } from './routes/FleetMapPage'
+// 2026-09-08 室外地图暂隐藏：路由已注释（低空经济二期恢复时取消注释）
+// import { FleetMapPage } from './routes/FleetMapPage'
 import { FleetPage } from './routes/FleetPage'
 import { Login } from './routes/LoginPage'
 import { SignUp } from './routes/SignUp'
 import { startWS, stopAllWS } from './lib/wsHub'
 import { SpeakBubble } from './components/overlays/SpeakBubble'
+import { FeedToasts } from './components/overlays/FeedToasts'
 import { ChatPanel } from './components/ChatPanel'
 import { supabase, isSupabaseEnabled } from './lib/supabase'
 import { subscribeAlerts } from './lib/realtime'
@@ -50,7 +52,8 @@ function MainLayout() {
           <Route path="/alerts" element={<AlertsPage />} />
           <Route path="/tenants" element={<TenantsPage />} />
           <Route path="/ota" element={<OtaPage />} />
-          <Route path="/fleet-map" element={<FleetMapPage />} />
+          {/* 2026-09-08 室外地图暂隐藏（低空经济二期再开放），Sidebar 入口同步注释 */}
+          {/* <Route path="/fleet-map" element={<FleetMapPage />} /> */}
           <Route path="/fleet" element={<FleetPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -161,7 +164,8 @@ export default function App() {
 
   return (
     <TenantBranding>
-      <BrowserRouter>
+      {/* 2026-09-09 路演前消掉 React Router v7 future flag 启动警告（v6.19+ 支持 opt-in） */}
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
@@ -172,6 +176,8 @@ export default function App() {
         </Routes>
         {/* 全局播报气泡，所有页面都能弹 */}
         <SpeakBubble />
+        {/* 订阅推送 toast：wsHub 收到状态翻转/新告警时右上角浮动提示（路演演示） */}
+        <FeedToasts />
         {/* AI 运维助手入口 */}
         <ChatPanel />
       </BrowserRouter>

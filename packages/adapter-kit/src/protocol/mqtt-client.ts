@@ -3,8 +3,8 @@ import mqtt from 'mqtt';
 import type { UnifiedRobotState, UnifiedAlert } from '../types/unified';
 import { adaptByBrandEnhanced } from '../adapters';
 
-// broker 地址 + 工业遥测主题（与 fanuc_mock.py / kuka_mock.py 发布主题一致）
-const MQTT_BROKER = 'ws://localhost:9001';   // MQTT over WebSocket（浏览器用）
+// 工业遥测主题（与 fanuc_mock.py / kuka_mock.py 发布主题一致）
+// 2026-09-08 broker 地址从 VITE_MQTT_BROKER_URL 读取；未配置时跳过连接（留空走 WebSocket mock）
 const TELEMETRY_TOPIC = 'roboticsops/telemetry';
 // 2026-08-21 OTA 状态订阅主题（轻量OTA开发文档第 10.2 节）
 const OTA_STATUS_TOPIC = 'roboticsops/ota/+/status';
@@ -23,12 +23,20 @@ export function connectMqtt(callback: TelemetryCallback, otaCallback?: OtaStatus
   onTelemetry = callback;
   onOtaStatus = otaCallback ?? null;
 
+  // 未配置 broker 地址时跳过：避免每 5s 重连 ws://localhost:9001 刷 console 错误
+  // （adapter-kit 也可能跑在非 vite 环境，import.meta.env 需安全取值）
+  const brokerUrl = ((import.meta as any).env?.VITE_MQTT_BROKER_URL as string | undefined)?.trim();
+  if (!brokerUrl) {
+    console.info('[mqtt-client] VITE_MQTT_BROKER_URL 未配置，跳过 MQTT 连接（走 WS mock）');
+    return;
+  }
+
   if (client && client.connected) {
     console.log('[mqtt-client] already connected');
     return;
   }
 
-  client = mqtt.connect(MQTT_BROKER, {
+  client = mqtt.connect(brokerUrl, {
     clientId: `robotops-web-${Math.random().toString(16).slice(2, 8)}`,
     clean: true,
     reconnectPeriod: 5000,
@@ -38,7 +46,7 @@ export function connectMqtt(callback: TelemetryCallback, otaCallback?: OtaStatus
   });
 
   client.on('connect', () => {
-    console.log('[mqtt-client] ✅ connected to', MQTT_BROKER);
+    console.log('[mqtt-client] ✅ connected to', brokerUrl);
     // 订阅工业遥测
     client!.subscribe(TELEMETRY_TOPIC, (err) => {
       if (err) console.error('[mqtt-client] subscribe telemetry error:', err);

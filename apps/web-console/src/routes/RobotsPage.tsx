@@ -39,11 +39,78 @@ const STATUS_LABELS: Record<string, string> = {
   charging: '充电中',
 }
 
+// 2026-09-09 左侧列表行组件：只订阅自己那台机器人。
+// 遥测高频更新时仅对应行重渲染（状态色点/电量文本），
+// 搜索框、筛选按钮、3D 与详情面板不受其他机器人遥测打扰
+function RobotRow({ robotId, isSelected, onOpen }: { robotId: string; isSelected: boolean; onOpen: () => void }) {
+  const r = useRobotStore((s) => s.robots[robotId])
+  if (!r) return null
+  const color = STATUS_COLORS[r.status] ?? 'var(--text-tertiary)'
+  return (
+    <div
+      onClick={onOpen}
+      style={{
+        cursor: 'pointer',
+        padding: '10px 12px',
+        borderRadius: 'var(--radius-sm)',
+        background: isSelected ? 'var(--primary-dim)' : 'var(--bg-elev-2)',
+        border: `1px solid ${isSelected ? 'var(--primary)' : 'var(--border-base)'}`,
+        borderLeft: `3px solid ${color}`,
+        transition: 'all 0.2s',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+      }}
+    >
+      <span
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          background: color,
+          boxShadow: `0 0 6px ${color}`,
+          animation: 'pulse-dot 2s ease infinite',
+          flexShrink: 0,
+        }}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+            fontFamily: 'var(--font-mono)',
+          }}
+        >
+          {r.robotId}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+          {r.brand} · {r.model}
+        </div>
+      </div>
+      <span
+        style={{
+          fontSize: 10,
+          fontFamily: 'var(--font-mono)',
+          color: isIndustrialArm(r.brand)
+            ? 'var(--alert-warn)'
+            : r.batteryPct < 20
+              ? 'var(--status-error)'
+              : 'var(--text-tertiary)',
+        }}
+      >
+        {isIndustrialArm(r.brand)
+          ? `${r.industrial?.joints?.[0]?.load_pct ?? 0}% 负载`
+          : `${r.batteryPct}%`}
+      </span>
+    </div>
+  )
+}
+
 // 机器人管理页面，左侧列表、中间 3D、右侧详情
 export function RobotsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { robots } = useRobotStore()
   const alerts = useAlertStore((s) => s.alerts)
   const clearAlerts = useAlertStore((s) => s.clearAlerts)
   const addAlert = useAlertStore((s) => s.addAlert)
@@ -53,9 +120,10 @@ export function RobotsPage() {
   const [confirmCmd, setConfirmCmd] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
 
-  const robotList = Object.values(robots)
-  // URL 带 id 时显示指定机器人，否则默认选中列表第一台；刷新后不会丢失选中状态
-  const selected = id ? robots[id] : robotList[0]
+  // 2026-09-09 订阅拆分：只订阅当前选中台——页面（3D + 详情面板）重渲染频率
+  // 从「任意机器人遥测」降到「选中台自己的遥测」，左侧行各自独立订阅
+  const firstId = useRobotStore((s) => Object.keys(s.robots)[0])
+  const selected = useRobotStore((s) => (id ? s.robots[id] : firstId ? s.robots[firstId] : undefined))
 
   const showToast = useCallback((msg: string, type: 'ok' | 'err') => {
     setToast({ msg, type })
@@ -102,16 +170,25 @@ export function RobotsPage() {
     [selected, confirmCmd, addAlert, showToast]
   )
 
-  const filteredList = useMemo(() => {
-    return robotList.filter((r) => {
-      const matchSearch =
-        search === '' ||
-        r.robotId.toLowerCase().includes(search.toLowerCase()) ||
-        r.model.toLowerCase().includes(search.toLowerCase())
-      const matchStatus = statusFilter === 'all' || r.status === statusFilter
-      return matchSearch && matchStatus
-    })
-  }, [robotList, search, statusFilter])
+  // 2026-09-09 过滤结果订阅「签名」：过滤条件（搜索词/状态筛选）与结果 id 集合都没变时
+  // 不触发壳重渲染——机器人状态翻转会改变过滤结果，签名随之变化正确重渲染
+  const filteredSig = useRobotStore((s) =>
+    Object.values(s.robots)
+      .filter((r) => {
+        const matchSearch =
+          search === '' ||
+          r.robotId.toLowerCase().includes(search.toLowerCase()) ||
+          r.model.toLowerCase().includes(search.toLowerCase())
+        const matchStatus = statusFilter === 'all' || r.status === statusFilter
+        return matchSearch && matchStatus
+      })
+      .map((r) => r.robotId)
+      .join('\u0000'),
+  )
+  const filteredIds = useMemo(
+    () => (filteredSig === '' ? [] : filteredSig.split('\u0000')),
+    [filteredSig],
+  )
 
   const robotAlerts = selected
     ? alerts.filter((a) => a.robotId === selected.robotId)
@@ -185,7 +262,7 @@ export function RobotsPage() {
               gap: 6,
             }}
           >
-            {filteredList.length === 0 && (
+            {filteredIds.length === 0 && (
               <div
                 style={{
                   color: 'var(--text-tertiary)',
@@ -197,79 +274,14 @@ export function RobotsPage() {
                 无匹配机器人
               </div>
             )}
-            {filteredList.map((r) => {
-              const isSelected = selected?.robotId === r.robotId
-              const color = STATUS_COLORS[r.status] ?? 'var(--text-tertiary)'
-              return (
-                <div
-                  key={r.robotId}
-                  onClick={() => navigate(`/devices/${r.robotId}`)}
-                  style={{
-                    cursor: 'pointer',
-                    padding: '10px 12px',
-                    borderRadius: 'var(--radius-sm)',
-                    background: isSelected
-                      ? 'var(--primary-dim)'
-                      : 'var(--bg-elev-2)',
-                    border: `1px solid ${
-                      isSelected ? 'var(--primary)' : 'var(--border-base)'
-                    }`,
-                    borderLeft: `3px solid ${color}`,
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      background: color,
-                      boxShadow: `0 0 6px ${color}`,
-                      animation: 'pulse-dot 2s ease infinite',
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: 'var(--text-primary)',
-                        fontFamily: 'var(--font-mono)',
-                      }}
-                    >
-                      {r.robotId}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: 'var(--text-tertiary)',
-                      }}
-                    >
-                      {r.brand} · {r.model}
-                    </div>
-                  </div>
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontFamily: 'var(--font-mono)',
-                      color: isIndustrialArm(r.brand)
-                        ? 'var(--alert-warn)'
-                        : r.batteryPct < 20
-                        ? 'var(--status-error)'
-                        : 'var(--text-tertiary)',
-                    }}
-                  >
-                    {isIndustrialArm(r.brand)
-                      ? `${r.industrial?.joints?.[0]?.load_pct ?? 0}% 负载`
-                      : `${r.batteryPct}%`}
-                  </span>
-                </div>
-              )
-            })}
+            {filteredIds.map((rid) => (
+              <RobotRow
+                key={rid}
+                robotId={rid}
+                isSelected={selected?.robotId === rid}
+                onOpen={() => navigate(`/devices/${rid}`)}
+              />
+            ))}
           </div>
         </div>
 

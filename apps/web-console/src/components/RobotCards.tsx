@@ -37,15 +37,34 @@ function DeviceCard({ device }: { device: UnifiedRobotState }) {
   }
 }
 
+// 2026-09-09 单卡订阅组件：卡片只订阅自己的机器人，
+// 遥测高频更新时只有数据变化的那张卡重渲染（含工业臂关节表格），
+// 其他卡（含壳的 Tab / 空态）不动
+function DeviceCardByKey({ robotId, visible }: { robotId: string; visible: boolean }) {
+  const device = useRobotStore((s) => s.robots[robotId])
+  if (!device || !visible) return null
+  return <DeviceCard device={device} />
+}
+
 export function RobotCards() {
-  const robots = useRobotStore((s) => s.robots)
+  // 2026-09-09 壳组件订阅「id+设备类」签名（deviceClass 随设备静态，集合不变则引用稳定）：
+  // 6 台 10Hz 遥测不再重渲染 Tab 按钮和布局，只有增删设备才触发
+  const rosterSig = useRobotStore((s) =>
+    Object.entries(s.robots).map(([rid, r]) => `${rid}\u0001${deviceClassOf(r)}`).join('\u0000'),
+  )
+  const roster = useMemo(
+    () =>
+      rosterSig === ''
+        ? []
+        : rosterSig.split('\u0000').map((pair) => {
+            const [rid, cls] = pair.split('\u0001')
+            return { rid, cls: cls as DeviceClass }
+          }),
+    [rosterSig],
+  )
   const [tab, setTab] = useState<DeviceClass | 'all'>('all')
 
-  const list = useMemo(() => {
-    return Object.values(robots).filter((r) => {
-      return tab === 'all' || deviceClassOf(r) === tab
-    })
-  }, [robots, tab])
+  const visibleCount = roster.filter((r) => tab === 'all' || r.cls === tab).length
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -72,7 +91,7 @@ export function RobotCards() {
         ))}
       </div>
 
-      {list.length === 0 && (
+      {visibleCount === 0 && (
         <div
           style={{
             padding: 28,
@@ -95,8 +114,8 @@ export function RobotCards() {
           gap: 14,
         }}
       >
-        {list.map((r) => (
-          <DeviceCard key={r.robotId} device={r} />
+        {roster.map(({ rid, cls }) => (
+          <DeviceCardByKey key={rid} robotId={rid} visible={tab === 'all' || cls === tab} />
         ))}
       </div>
     </div>

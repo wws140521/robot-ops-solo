@@ -1,4 +1,6 @@
 export { RobotViewer } from './RobotViewer'
+// 2026-09-07 舰队全景：多机同屏 + 点击聚焦
+export { FleetViewer } from './FleetViewer'
 export { G1Humanoid, __danceToggle } from './robots/G1Humanoid'
 export { G1Dog } from './robots/G1Dog'
 export { PeanutBot } from './robots/PeanutBot'

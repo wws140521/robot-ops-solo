@@ -12,7 +12,7 @@ import {
   Sun,
   Moon,
   DownloadCloud,
-  Map,
+  // Map,  // 2026-09-08 室外地图隐藏后暂不用（恢复导航时取消注释）
   type LucideIcon,
 } from 'lucide-react'
 import { useTenantStore } from '../../stores/tenantStore'
@@ -27,7 +27,8 @@ const navItems: { to: string; label: string; icon: LucideIcon; end: boolean }[] 
   { to: '/sop',        label: 'SOP 编排', icon: Workflow,        end: false },
   { to: '/sop-sim',    label: 'SOP 模拟',  icon: Play,            end: false },
   { to: '/twin',       label: '数字孪生',  icon: Box,             end: false },
-  { to: '/fleet-map',  label: '室外地图',  icon: Map,             end: false },
+  // 2026-09-08 室外地图暂隐藏（低空经济二期再开放）：路由入口 + App.tsx 路由同步注释
+  // { to: '/fleet-map',  label: '室外地图',  icon: Map,             end: false },
   { to: '/fleet',      label: '设备总览',  icon: Bot,             end: false },
   { to: '/alerts',     label: '告警中心',  icon: Bell,            end: false },
   { to: '/tenants',    label: '租户管理',  icon: Building2,       end: false },

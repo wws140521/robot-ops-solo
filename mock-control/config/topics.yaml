@@ -1,0 +1,36 @@
+# mock-control/config/topics.yaml
+# MQTT Topic 规范（对齐 python-edge/ 和 roboticsops-edge/ 的命名约定）
+# 无 broker 时 Control Service 自动降级为 WebSocket 直连模式（/control topic）
+
+topics:
+  # 下行（控制指令）
+  command: "industrial/robot/{robotId}/command"
+  command_wildcard: "industrial/robot/+/command"
+
+  # 上行（遥测数据）
+  telemetry: "industrial/robot/{robotId}/telemetry"
+  telemetry_wildcard: "industrial/robot/+/telemetry"
+
+  # OTA（对齐 robot-ops-solo-轻量OTA开发文档.md）
+  ota_command: "ota/{robotId}/command"
+  ota_status: "ota/{robotId}/status"
+
+  # 告警广播（对齐 alertStore.addAlert）
+  alert: "alerts/broadcast"
+
+  # 语音播报（对齐 speakStore）
+  speak: "speak/broadcast"
+
+# 载荷规范
+payloads:
+  command:
+    required: [robotId, type]
+    optional: [params, source, ts]
+  telemetry:
+    # 对齐 UnifiedRobotState（adapter-kit/src/types/unified.ts）
+    required: [robotId, brand, deviceClass, online, status, battery, healthScore]
+    optional: [position, joints, alarms, dockState, vertiportState]
+  alert:
+    # 对齐 IndustrialAlarm（adapter-kit/src/types/industrial.ts）
+    required: [robotId, code, severity]
+    optional: [zh_desc, ts]

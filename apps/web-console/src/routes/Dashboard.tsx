@@ -1,22 +1,145 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useRobotStore } from '../stores/robotStore'
 import { useAlertStore } from '../stores/alertStore'
 import { useThemeStore } from '../stores/themeStore'
 import { RobotStatusCard, BatteryGauge, AlertItem, GlassCard, StatusDot, NeonBadge, TaskTimeline, HealthGauge, type TimelineItem } from 'ui-kit'
-import type { UnifiedRobotState, DeviceClass } from 'robot-adapter-kit'
+import type { UnifiedRobotState, UnifiedAlert, DeviceClass } from 'robot-adapter-kit'
 import { Download, Plus, Bot, BatteryCharging, Bell, LayoutGrid, CheckCircle2, X } from 'lucide-react'
 import { getBrandConfig } from '../lib/brandRegistry'
+
+// 2026-08-18 初版健康分：电量占 60%（移动机器人核心指标），在线与无错误各 20%
+// TODO: 加入温度衰减系数，高温环境电池权重从 0.3 降到 0.15
+// 简易健康分：电量占 60%，在线和无错误各 20%
+// 2026-09-09 工业臂市电供电 batteryPct 恒 0，按电池算恒 40 分会被误读成「整机快坏了」，
+// 工业臂单独走负载/告警评估：在线 50 + 无错误 20 + 负载正常 30
+// 2026-09-09 提到模块级：健康卡行组件独立订阅单台后也要用，避免每行闭包重建
+function calcHealth(r: UnifiedRobotState): number {
+  if (r.industrial) {
+    let score = r.online ? 50 : 15
+    if (!r.errorCode) score += 20
+    const loads = r.industrial.joints.map((j) => j.load_pct)
+    const avgLoad = loads.length ? loads.reduce((a, b) => a + b, 0) / loads.length : 0
+    score += avgLoad < 80 ? 30 : 15
+    if (r.status === 'error') score = Math.max(20, score - 30)
+    const result = Math.min(100, Math.round(score))
+    console.log('[health] 工业臂健康分:', { robotId: r.robotId, avgLoad: Math.round(avgLoad), online: r.online, score: result })
+    return result
+  }
+  let score = r.batteryPct * 0.6
+  if (r.online) score += 20
+  if (!r.errorCode) score += 20
+  // status=error 时保底 20 分，避免健康分看起来还“不错”
+  if (r.status === 'error') score = Math.max(20, score - 30)
+  const result = Math.min(100, Math.round(score))
+  console.log('[health] 健康分计算:', { robotId: r.robotId, battery: r.batteryPct, online: r.online, score: result })
+  return result
+}
+
+// 2026-09-09 健康卡行组件：只订阅自己的机器人，谁的遥测变了只重渲染谁的健康卡
+function RobotHealthCard({ robotId, onOpen }: { robotId: string; onOpen: () => void }) {
+  const r = useRobotStore((s) => s.robots[robotId])
+  if (!r) return null
+  const health = calcHealth(r)
+  return (
+    <div
+      onClick={onOpen}
+      style={{
+        position: 'relative',
+        padding: 14,
+        background: 'var(--bg-elev-1)',
+        border: '1px solid var(--border-base)',
+        borderRadius: 10,
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = 'var(--border-strong)'
+        e.currentTarget.style.transform = 'translateY(-2px)'
+        e.currentTarget.style.boxShadow = 'var(--shadow-pop)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'var(--border-base)'
+        e.currentTarget.style.transform = 'translateY(0)'
+        e.currentTarget.style.boxShadow = 'none'
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <NeonBadge brand={r.brand}>{r.robotId}</NeonBadge>
+            <StatusDot status={r.online ? (r.status === 'error' ? 'error' : 'online') : 'offline'} />
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+              {r.status === 'idle' ? '空闲' : r.status === 'moving' ? '移动中' : r.status === 'working' ? '工作中' : r.status === 'error' ? '故障' : '充电中'}
+            </span>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+            {r.brand} · {r.model}
+            {r.errorCode && (
+              <span style={{ color: 'var(--status-error)', marginLeft: 8 }}>
+                · 错误码: {r.errorCode}
+              </span>
+            )}
+          </div>
+        </div>
+        <HealthGauge value={health} size={64} label="健康" />
+      </div>
+    </div>
+  )
+}
+
+// 2026-09-09 告警流行组件：订阅单台品牌（原始值，遥测变化不重渲染）
+function AlertFeedRow({ alert, onOpen, onDismiss }: { alert: UnifiedAlert; onOpen: () => void; onDismiss: () => void }) {
+  const brand = useRobotStore((s) => s.robots[alert.robotId]?.brand ?? '')
+  const brandCfg = getBrandConfig(brand)
+  return (
+    <div
+      onClick={onOpen}
+      style={{ cursor: 'pointer', opacity: 1, transition: 'opacity 0.15s' }}
+      onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
+      onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+    >
+      <AlertItem alert={alert} onDismiss={onDismiss} brandColor={brandCfg.color} />
+    </div>
+  )
+}
+
+// 2026-09-09 时间轴空态填充组件：仅在「无告警」时挂载。
+// 订阅全量 robots（online/brand 变化需要刷新占位条目），演示有告警时零开销
+function TimelineFallback() {
+  const robotList = useRobotStore((s) => Object.values(s.robots))
+  const items: TimelineItem[] = robotList.slice(0, 3).map((r, i) => ({
+    time: `${(new Date().getHours() - i).toString().padStart(2, '0')}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`,
+    title: `${r.robotId} · 状态同步完成`,
+    status: 'done' as const,
+    desc: r.online ? `${r.brand} ${r.model} · 运行正常` : `设备离线，最后活动时间: ${new Date(r.lastSeen).toLocaleTimeString()}`,
+  }))
+  if (items.length === 0) {
+    return (
+      <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', padding: 28 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><CheckCircle2 size={16} /> 无告警，一切正常</span>
+      </div>
+    )
+  }
+  return <TaskTimeline items={items} />
+}
 
 // 运维总览 Dashboard
 export function Dashboard() {
   const navigate = useNavigate()
-  const { robots, onlineCount, addRobot } = useRobotStore()
+  // 2026-09-09 订阅拆分：KPI/布局只订阅派生原始值（数字/签名），
+  // 遥测高频更新时不再整页重渲染；健康卡行独立订阅单台
+  const onlineCount = useRobotStore((s) => s.onlineCount)
+  const robotCount = useRobotStore((s) => Object.keys(s.robots).length)
+  const addRobot = useRobotStore((s) => s.addRobot)
+  // 平均电量只统计电池设备：工业臂市电供电 batteryPct 恒 0，
+  // 算进平均会把「平均电量 60%」拉成 30%，评审会误读成舰队快没电了
+  const avgPower = useRobotStore((s) => {
+    const list = Object.values(s.robots).filter((r) => !r.industrial)
+    return list.length ? Math.round(list.reduce((sum, r) => sum + r.batteryPct, 0) / list.length) : 0
+  })
   const alerts = useAlertStore((s) => s.alerts)
   const clearAlerts = useAlertStore((s) => s.clearAlerts)
-  const robotList = Object.values(robots)
-  const totalPower = robotList.reduce((sum, r) => sum + r.batteryPct, 0)
-  const avgPower = robotList.length ? Math.round(totalPower / robotList.length) : 0
 
   const todayAlerts = alerts.filter(
     (a) => new Date(a.timestamp).toDateString() === new Date().toDateString()
@@ -67,9 +190,10 @@ export function Dashboard() {
     setNewBrand(BRAND_BY_CLASS[cls][0].value)
   }
 
-  // 导出机器人状态 CSV
+  // 导出机器人状态 CSV（2026-09-09 事件处理器改 getState 快照，不随遥测重渲染）
   const handleExport = () => {
     const ts = new Date().toISOString().replace(/[:.]/g, '-')
+    const robotList = Object.values(useRobotStore.getState().robots)
     const rows = [
       ['Robot ID', 'Brand', 'Model', 'Battery %', 'Status', 'Position X', 'Position Y', 'Online'],
       ...robotList.map((r) => [
@@ -171,21 +295,7 @@ export function Dashboard() {
     setShowAdd(false)
   }
 
-  // 2026-08-18 初版健康分：电量占 60%（移动机器人核心指标），在线与无错误各 20%
-  // TODO: 加入温度衰减系数，高温环境电池权重从 0.3 降到 0.15
-  // 简易健康分：电量占 60%，在线和无错误各 20%
-  const calcHealth = (r: UnifiedRobotState): number => {
-    let score = r.batteryPct * 0.6
-    if (r.online) score += 20
-    if (!r.errorCode) score += 20
-    // status=error 时保底 20 分，避免健康分看起来还“不错”
-    if (r.status === 'error') score = Math.max(20, score - 30)
-    const result = Math.min(100, Math.round(score))
-    console.log('[health] 健康分计算:', { robotId: r.robotId, battery: r.batteryPct, online: r.online, score: result })
-    return result
-  }
-
-  // 生成时间轴数据（告警 + 机器人状态变化）
+  // 生成时间轴数据（告警条目；空态占位由 TimelineFallback 独立订阅渲染）
   const timelineItems: TimelineItem[] = alerts.slice(0, 5).map((a) => ({
     time: new Date(a.timestamp).toLocaleTimeString().slice(0, 5),
     title: `${a.robotId} · ${a.message}`,
@@ -193,17 +303,12 @@ export function Dashboard() {
     desc: `[${a.code}] ${a.robotId} 告警`,
   }))
 
-  // 时间轴为空时填充最近 3 台机器人状态，避免页面空白；分钟用随机数仅作占位展示
-  if (timelineItems.length === 0) {
-    timelineItems.push(
-      ...robotList.slice(0, 3).map((r, i) => ({
-        time: `${(new Date().getHours() - i).toString().padStart(2, '0')}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`,
-        title: `${r.robotId} · 状态同步完成`,
-        status: 'done' as const,
-        desc: r.online ? `${r.brand} ${r.model} · 运行正常` : `设备离线，最后活动时间: ${new Date(r.lastSeen).toLocaleTimeString()}`,
-      }))
-    )
-  }
+  // 2026-09-09 健康卡列表只订阅 id 签名：设备集合不变时壳不重渲染，行组件各自订阅单台
+  const robotIdSig = useRobotStore((s) => Object.keys(s.robots).join('\u0000'))
+  const robotIds = useMemo(
+    () => (robotIdSig === '' ? [] : robotIdSig.split('\u0000')),
+    [robotIdSig],
+  )
 
   return (
     <div style={{ animation: 'ng-fade-in-up 0.16s ease-out' }}>
@@ -304,7 +409,7 @@ export function Dashboard() {
         <KpiCard
           label="在线机器人"
           value={onlineCount}
-          total={robotList.length}
+          total={robotCount}
           color="var(--status-online)"
           trend="+2"
           trendUp
@@ -369,10 +474,10 @@ export function Dashboard() {
                 fontFamily: 'var(--font-mono)',
               }}
             >
-              {robotList.length} UNITS
+              {robotIds.length} UNITS
             </span>
           </div>
-          {robotList.length === 0 && (
+          {robotIds.length === 0 && (
             <div
               style={{
                 color: 'var(--text-muted)',
@@ -385,56 +490,9 @@ export function Dashboard() {
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {robotList.map((r) => {
-              const brandCfg = getBrandConfig(r.brand)
-              const health = calcHealth(r)
-              return (
-                <div
-                  key={r.robotId}
-                  onClick={() => navigate(`/devices/${r.robotId}`)}
-                  style={{
-                    position: 'relative',
-                    padding: 14,
-                    background: 'var(--bg-elev-1)',
-                    border: '1px solid var(--border-base)',
-                    borderRadius: 10,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--border-strong)'
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                    e.currentTarget.style.boxShadow = 'var(--shadow-pop)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--border-base)'
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = 'none'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <NeonBadge brand={r.brand}>{r.robotId}</NeonBadge>
-                        <StatusDot status={r.online ? (r.status === 'error' ? 'error' : 'online') : 'offline'} />
-                        <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                          {r.status === 'idle' ? '空闲' : r.status === 'moving' ? '移动中' : r.status === 'working' ? '工作中' : r.status === 'error' ? '故障' : '充电中'}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
-                        {r.brand} · {r.model}
-                        {r.errorCode && (
-                          <span style={{ color: 'var(--status-error)', marginLeft: 8 }}>
-                            · 错误码: {r.errorCode}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <HealthGauge value={health} size={64} label="健康" />
-                  </div>
-                </div>
-              )
-            })}
+            {robotIds.map((rid) => (
+              <RobotHealthCard key={rid} robotId={rid} onOpen={() => navigate(`/devices/${rid}`)} />
+            ))}
           </div>
         </GlassCard>
 
@@ -471,39 +529,16 @@ export function Dashboard() {
 
           {alerts.length > 0 && (
             <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid var(--border-subtle)' }}>
-              {alerts.slice(0, 3).map((a, i) => {
-                const robot = robots[a.robotId]
-                const brandCfg = getBrandConfig(robot?.brand || '')
-                return (
-                  <div
-                    key={i}
-                    onClick={() => navigate(`/devices/${a.robotId}`)}
-                    style={{
-                      cursor: 'pointer',
-                      opacity: 1,
-                      transition: 'opacity 0.15s',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
-                    onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
-                  >
-                    <AlertItem alert={a} onDismiss={clearAlerts} brandColor={brandCfg.color} />
-                  </div>
-                )
-              })}
+              {alerts.slice(0, 3).map((a, i) => (
+                <AlertFeedRow key={`${a.robotId}-${a.timestamp}-${i}`} alert={a} onOpen={() => navigate(`/devices/${a.robotId}`)} onDismiss={clearAlerts} />
+              ))}
             </div>
           )}
 
           {timelineItems.length === 0 ? (
-            <div
-              style={{
-                color: 'var(--text-muted)',
-                fontSize: 13,
-                textAlign: 'center',
-                padding: 28,
-              }}
-            >
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><CheckCircle2 size={16} /> 无告警，一切正常</span>
-            </div>
+            // 2026-09-09 空态占位抽独立组件：只有无告警时才订阅 robots，
+            // 有告警的演示时段这棵子树不挂载，遥测更新零开销
+            <TimelineFallback />
           ) : (
             <TaskTimeline items={timelineItems} />
           )}

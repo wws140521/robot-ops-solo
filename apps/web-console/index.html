@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- P6 安全加固：CSP（新增 2026-08-29 高德地图域名；高德必须 unsafe-eval + blob worker-src）-->
+    <!-- P6 安全加固：CSP（新增 2026-08-29 高德地图域名；高德必须 unsafe-eval + blob worker-src）
+         注：frame-ancestors 仅在 HTTP header 有效，经 meta 交付会被 Chrome 忽略并报错，故不放在这里 -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
       script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://*.amap.com https://webapi.amap.com https://webst01.amap.com https://webst02.amap.com https://webst03.amap.com https://webst04.amap.com https://restapi.amap.com https://lbs.amap.com https://mapplugin.amap.com;
@@ -12,27 +13,36 @@
       connect-src 'self' ws://localhost:* wss://localhost:* ws://127.0.0.1:* wss://127.0.0.1:* https://*.supabase.co wss://*.supabase.co https://raw.githack.com https://*.githubusercontent.com https://unpkg.com https://cdn.jsdelivr.net https://webapi.amap.com https://*.amap.com https://restapi.amap.com https://lbs.amap.com https://*.amapapis.com;
       img-src 'self' data: https: https://*.amap.com https://webst01.amap.com https://webst02.amap.com https://webst03.amap.com https://webst04.amap.com https://*.amapapis.com;
       worker-src 'self' blob:;
-      frame-ancestors 'none';
     " />
     <title>Robot-Ops Console</title>
+    <!-- 2026-09-08 内联 SVG favicon：避免 /favicon.ico 404 刷 console -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
 
-    <!-- 2026-08-29 高德 JSAPI 安全密钥（AMap 2021-12-02 起强制要求）
-         Vite 不会自动把 import.meta.env 注入 index.html，故硬编码实际值 -->
+    <!-- 2026-09-09 高德 JSAPI 全局注入整体关闭（室外地图功能暂不上路演）：
+         路由 /fleet-map 已在 App.tsx 注释，lib/amap.ts 仅被 MapRobotViewer 引用、
+         MapRobotViewer 仅被 FleetMapPage 引用 —— 关掉不影响任何可达页面，
+         同时避免每页无谓加载外部 SDK + 硬编码 key 外泄。
+         低空二期恢复时，把下面两段 script 一起取消注释即可。
+         注：CSP 里的 amap 域名条目保留（无害，恢复时无需改动 CSP）。
+
     <script type="text/javascript">
       window._AMapSecurityConfig = {
         securityJsCode: '3c1933808a48dbcee4fbb62461b45534',
       }
     </script>
+    -->
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
 
-    <!-- 高德 JSAPI 2.0 —— 室外地图/路径规划/GLCustomLayer
-         Vite 不会替换 script src 里的占位符，key 直接硬编码 -->
+    <!-- 2026-09-09 高德 JSAPI 2.0 加载标签已注释（室外地图/路径规划/GLCustomLayer 暂不上路演）
+         Vite 不会替换 script src 里的占位符，key 是硬编码的 -->
+    <!--
     <script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=7a9af229a5da7eec1ea561e209ba59b5&plugin=AMap.Walking,AMap.PlaceSearch,AMap.Geocoder,AMap.Scale,AMap.ControlBar,AMap.GLCustomLayer"></script>
+    -->
   </body>
 </html>

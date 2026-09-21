@@ -1,4 +1,4 @@
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls, Grid, ContactShadows, AdaptiveDpr, AdaptiveEvents } from '@react-three/drei'
 import { memo, useRef, useState, useEffect } from 'react'
 import { G1Humanoid } from './robots/G1Humanoid'
@@ -7,8 +7,6 @@ import { FanucArm } from './robots/FanucArm'
 import { KukaArm } from './robots/KukaArm'
 import { IndustrialRobotModel } from './robots/IndustrialRobotModel'
 import { Floor, ConcreteFloor } from './environment/Floor'
-import { IndustrialPedestal, PEDESTAL_HEIGHT } from './environment/IndustrialPedestal'
-import { SceneAssets } from './environment/SceneAssets'
 import { isIndustrialBrand } from './config/industrial-models'
 
 import { useScenePalette } from './hooks/useScenePalette'
@@ -17,10 +15,27 @@ import type { UnifiedRobotState, JointTelemetry } from 'robot-adapter-kit'
 interface RobotViewerProps {
   robotId: string
   state?: UnifiedRobotState
+  // 2026-09-09 showMap 废弃：场景道具（充电桩/安全标线）已按「地面得有、其他东西不能有」统一撤掉
+  /** @deprecated 2026-09-09 场景道具已移除，此参数不再生效 */
   showMap?: boolean
+  // 告警→3D 联动：故障关节号（工业臂 J1~J6），传入后该关节红色脉冲闪烁
+  faultJoint?: number | null
 }
 
-export function RobotViewer({ state, showMap = true }: RobotViewerProps) {
+// 调试桥：把当前 R3F scene 挂到 window.__twinScene，
+// 供浏览器 evaluate_script 检查场景内容（mesh 清单/道具残留排查）
+export function SceneDebugBridge() {
+  const scene = useThree((s) => s.scene)
+  useEffect(() => {
+    ;(window as unknown as Record<string, unknown>).__twinScene = scene
+    return () => {
+      delete (window as unknown as Record<string, unknown>).__twinScene
+    }
+  }, [scene])
+  return null
+}
+
+export function RobotViewer({ state, faultJoint = null }: RobotViewerProps) {
   const palette = useScenePalette()
 
   // 用 ref 缓存最新 state，防止短暂 falsy 导致 RobotBody 卸载
@@ -36,8 +51,10 @@ export function RobotViewer({ state, showMap = true }: RobotViewerProps) {
   if (effectiveState) hasEverHadStateRef.current = true
   const shouldRenderRobot = effectiveState || hasEverHadStateRef.current
 
-  // 工业设备用车间场景（混凝土地坪+基座），商用设备维持原来的光洁地面
+  // 工业设备用车间场景（混凝土地坪），商用设备维持光洁地面 + 细网格
   const industrial = isIndustrialBrand(effectiveState?.brand)
+  // 2026-09-09 各场景统一「地面得有、其他东西不能有」：
+  // 地面（光洁地面/细网格 或 混凝土地坪）保留，充电桩、安全标线、工业基座等道具全部撤掉
 
   return (
     <div
@@ -60,15 +77,18 @@ export function RobotViewer({ state, showMap = true }: RobotViewerProps) {
         <color attach="background" args={[palette.bgBottom]} />
         <fog attach="fog" args={[palette.fog, 14, 32]} />
 
+        <SceneDebugBridge />
+
         {/* 2026-08-28 静态场景元素 memo 化：灯光/地面/网格/阴影/墙体仅依赖 palette+showMap，
             避免 WS 高频帧（~10Hz）触发重建导致网格几何重绘闪烁 */}
-        <SceneEnvironment palette={palette} showMap={showMap} industrial={industrial} />
+        <SceneEnvironment palette={palette} industrial={industrial} />
 
         {/* 机器人 —— 始终挂载，G1Model 内部用 useRef 管理加载状态，不会因短暂 falsy 卸载 */}
         {shouldRenderRobot && (
           <RobotBody
             state={effectiveState ?? lastValidStateRef.current!}
             visible={!!effectiveState}
+            faultJoint={faultJoint}
           />
         )}
 
@@ -105,13 +125,12 @@ export function RobotViewer({ state, showMap = true }: RobotViewerProps) {
 // - Grid 抬升 y=0.005 避免与 Floor(y=0) z-fighting
 // - 降低线宽减少深度缓冲竞争
 // - memo 包裹避免 WS 帧触发重建
-const SceneEnvironment = memo(function SceneEnvironment({
+// 2026-09-07 导出给 FleetViewer（舰队全景）复用同一套灯光/地面/阴影
+export const SceneEnvironment = memo(function SceneEnvironment({
   palette,
-  showMap,
   industrial,
 }: {
   palette: ReturnType<typeof useScenePalette>
-  showMap: boolean
   industrial: boolean
 }) {
   return (
@@ -151,7 +170,8 @@ const SceneEnvironment = memo(function SceneEnvironment({
       />
 
       {/* 地面：工业设备铺混凝土地坪（自带伸缩缝网格），
-          商用设备保持原来的光洁地面 + 细网格 */}
+          商用设备保持光洁地面 + 细网格。
+          2026-09-09 撤掉充电桩/安全标线等所有场景道具，只留地面本身 */}
       {industrial ? (
         <ConcreteFloor palette={palette} />
       ) : (
@@ -177,11 +197,6 @@ const SceneEnvironment = memo(function SceneEnvironment({
         </>
       )}
 
-      {/* 充电桩和安全标线是商用机器人场景的道具，车间里不需要 */}
-      {showMap && !industrial && (
-        <SceneAssets palette={palette} />
-      )}
-
       <ContactShadows
         position={[0, 0.012, 0]}
         opacity={0.2}
@@ -195,13 +210,13 @@ const SceneEnvironment = memo(function SceneEnvironment({
   )
 })
 
-function RobotBody({ state, visible = true }: { state: UnifiedRobotState; visible?: boolean }) {
+function RobotBody({ state, visible = true, faultJoint = null }: { state: UnifiedRobotState; visible?: boolean; faultJoint?: number | null }) {
   // 工业臂的 state.position 是 TCP 末端位姿（毫米级，±500 范围），
-  // 不是基座世界坐标——拿来摆放模型会直接飞出相机视野，所以固定放原点；
-  // y 抬到 PEDESTAL_HEIGHT，让基座正好落在钢底板顶面上
+  // 不是基座世界坐标——拿来摆放模型会直接飞出相机视野，所以固定放原点。
+  // 2026-09-09 基座撤掉后直接落地（y=0），基面落在混凝土地坪上
   const industrial = isIndustrialBrand(state.brand)
   const pos: [number, number, number] = industrial
-    ? [0, PEDESTAL_HEIGHT, 0]
+    ? [0, 0, 0]
     : [state.position.x, 0, state.position.y]
   const rot: [number, number, number] = industrial
     ? [0, 0, 0]
@@ -221,9 +236,6 @@ function RobotBody({ state, visible = true }: { state: UnifiedRobotState; visibl
       {state.brand === 'unitree' && <G1Humanoid position={pos} rotation={rot} scale={1.0} />}
       {state.brand === 'keenon' && <PeanutBot position={pos} rotation={rot} />}
 
-      {/* 螺栓底座：混凝土基墩+钢底板，URDF 和降级机械臂都站在上面 */}
-      {industrial && <IndustrialPedestal />}
-
       {isIndustrialBrand(state.brand) && !urdfFailed && (
         <IndustrialRobotModel
           brand={state.brand}
@@ -231,6 +243,7 @@ function RobotBody({ state, visible = true }: { state: UnifiedRobotState; visibl
           rotation={rot}
           joints={industrialJoints}
           visible={visible}
+          faultJoint={faultJoint}
           onLoadError={(err) => {
             console.warn(`[RobotViewer] ${state.brand} 真实模型加载失败，降级到程序化机械臂:`, err.message)
             setUrdfFailed(true)

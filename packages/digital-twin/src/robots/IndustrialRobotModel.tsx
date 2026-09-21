@@ -19,6 +19,11 @@ interface Props {
   scale?: number
   joints: JointTelemetry[]
   visible?: boolean
+  // 单机模式默认 true：隐藏其他品牌 anchor，防止切换设备时旧模型残影
+  // 舰队全景同屏渲染多品牌时要传 false，不然后挂载的会把先挂载的全藏掉
+  isolate?: boolean
+  // 告警→3D 联动：故障关节号（1-based，J1~J6），该关节臂段红色脉冲闪烁定位故障
+  faultJoint?: number | null
   // 加载失败时通知上层降级
   onLoadError?: (err: Error) => void
 }
@@ -150,6 +155,25 @@ function applyJointLoadColors(
   })
 }
 
+// 还原指定关节臂段的材质到品牌原色（故障闪烁解除时用）
+// 闪烁是每帧压着负载色刷的，解除后要手动刷回原色，负载色逻辑下一帧遥测自然接管
+// 只处理 link 的直接 mesh 子节点——闪烁本来就只染故障关节那一段臂身
+function restoreJointColor(robot: URDFRobot, jointName: string | undefined) {
+  if (!jointName) return
+  const joint = robot.joints.get(jointName)
+  const childLink = joint?.children.find((c) => c.name?.startsWith('link_'))
+  if (!childLink) return
+  childLink.children.forEach((obj) => {
+    const mesh = obj as THREE.Mesh
+    if (!mesh.isMesh) return
+    const mat = mesh.material as THREE.MeshStandardMaterial | undefined
+    if (!mat || Array.isArray(mat) || mat.userData.__origColor === undefined) return
+    mat.color.setHex(mat.userData.__origColor)
+    mat.emissive?.setHex(mat.userData.__origEmissive ?? 0)
+    mat.emissiveIntensity = mat.userData.__origEmissiveIntensity ?? 1
+  })
+}
+
 export function IndustrialRobotModel({
   brand,
   position,
@@ -157,6 +181,8 @@ export function IndustrialRobotModel({
   scale = 1,
   joints,
   visible = true,
+  isolate = true,
+  faultJoint = null,
   onLoadError,
 }: Props) {
   const { scene } = useThree()
@@ -190,20 +216,25 @@ export function IndustrialRobotModel({
   }, [brand, anchor, onLoadError])
 
   // 把 anchor 加入场景，只加一次
-  // 同时隐藏其他品牌的 anchor，避免切换设备时多个模型叠在一起
+  // 单机模式下同时隐藏其他品牌的 anchor（isolate=true），避免切换设备时多个模型叠在一起
+  // 舰队全景 isolate=false：4 品牌本来就要同屏，谁也不许藏谁
   useEffect(() => {
-    if (!anchor.parent) {
+    // 2026-09-09 修复跨视图导航后工业臂永久消失：原 !anchor.parent 在舰队↔单机
+    // 切换时仍指向已销毁的旧 scene（truthy），跳过 add。改为与当前 scene 实际比对。
+    if (anchor.parent !== scene) {
       scene.add(anchor)
     }
-    // 把同类型其他品牌的 anchor 都藏起来，只留当前这个
-    Object.keys(anchorCache).forEach((b) => {
-      if (b !== brand) anchorCache[b].visible = false
-    })
+    if (isolate) {
+      // 把同类型其他品牌的 anchor 都藏起来，只留当前这个
+      Object.keys(anchorCache).forEach((b) => {
+        if (b !== brand) anchorCache[b].visible = false
+      })
+    }
     // 组件卸载时把自己的 anchor 也藏掉，不然切到非工业设备时它还亮着
     return () => {
       anchor.visible = false
     }
-  }, [anchor, scene, brand])
+  }, [anchor, scene, brand, isolate])
 
   // 每帧同步位置/旋转/缩放，visible 也在这里控制
   // 因为 anchor 是直接挂在 scene 上的，外层 R3F group 的 visible 管不到它
@@ -231,13 +262,49 @@ export function IndustrialRobotModel({
     }
   }, [brand, joints])
 
+  // 故障关节跟踪：faultJoint 清空/切换时还原上一个闪烁关节的品牌原色
+  // （闪烁是 useFrame 里逐帧刷的，不清掉会一直红着）
+  const prevFaultRef = useRef<{ brand: string; joint: number } | null>(null)
+  useEffect(() => {
+    const prev = prevFaultRef.current
+    const cur = faultJoint != null ? { brand, joint: faultJoint } : null
+    prevFaultRef.current = cur
+    if (prev && (prev.brand !== cur?.brand || prev.joint !== cur?.joint)) {
+      const robot = robotCache[prev.brand]
+      if (robot) {
+        restoreJointColor(robot, INDUSTRIAL_MODELS[prev.brand as IndustrialBrand].jointMap[prev.joint])
+      }
+    }
+  }, [faultJoint, brand])
+
   // 关节角平滑：每帧朝目标插值（时间常数 0.25s，跟遥测间隔匹配）
   // 机器人刚就绪或切品牌时直接吸附到目标，别从零位慢慢摆过去
-  useFrame((_, delta) => {
+  useFrame(({ clock }, delta) => {
     const robot = robotCache[brand]
     if (!robot) return
     const targets = jointTargetsRef.current
     const cur = jointCurrentRef.current
+
+    // ── 故障关节红色脉冲闪烁（告警→3D 联动）──
+    // 60Hz 逐帧刷，压过 2Hz 的负载色刷新；sin 脉冲让故障位置一眼锁定
+    // 只染 link 的直接 mesh 子节点（= 该关节驱动的那段臂身），下游臂段不跟着闪
+    if (faultJoint != null) {
+      const jointName = INDUSTRIAL_MODELS[brand].jointMap[faultJoint]
+      const joint = robot.joints.get(jointName)
+      const childLink = joint?.children.find((c) => c.name?.startsWith('link_'))
+      if (childLink) {
+        const pulse = 0.25 + 0.65 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 7))
+        childLink.children.forEach((obj) => {
+          const mesh = obj as THREE.Mesh
+          if (!mesh.isMesh) return
+          const mat = mesh.material as THREE.MeshStandardMaterial | undefined
+          if (!mat || Array.isArray(mat) || mat.userData.__origColor === undefined) return
+          mat.color.setHex(LOAD_RED)
+          mat.emissive?.setHex(LOAD_RED)
+          mat.emissiveIntensity = pulse
+        })
+      }
+    }
 
     if (snappedBrandRef.current !== brand) {
       // 初次加载/切品牌：一次到位

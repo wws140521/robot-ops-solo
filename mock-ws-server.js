@@ -41,6 +41,208 @@ function isObstacle(wx, wz) {
   return false
 }
 
+// ══════════════════════════════════════════════════════════════════
+// 🆕 Mock Control Integration（操作页面双向控制支持 · doc/mock-control-panel-dev-guide.md）
+// 指令入口两条：WS 直连（{ topic: '/control', data: command }）或 MQTT 订阅
+// （industrial/robot/+/command）。有 mosquitto 时走 MQTT，没有时 Control Service
+// 自动降级 WS 直连——两条路最终都汇聚到 applyExternalCommand()。
+// ══════════════════════════════════════════════════════════════════
+
+let g1Paused = false       // 操作面板 stop/pause → G1 位置/电量冻结
+let peanutPaused = false  // Peanut 同上
+let g1TurnRate = 0        // G1 当前转向角速度 rad/s（角加速度限幅状态，类人起转/滑出）
+const suppressUntil = new Map()  // robotId → 时间戳，simulate_offline 期间跳过该设备广播
+
+// 操作面板可注入的告警码描述（对齐 Control Service 的 ALARM_DESC 池）
+const CONTROL_ALARM_DESC = {
+  'SRVO-001': '伺服放大器过流',
+  'SRVO-023': '伺服过载（J2 轴电机过热）',
+  'SRVO-062': '伺服放大器过热',
+  'OH-002': '变频器散热器过热',
+  'KSS-004': 'KSS 轴工作范围超限',
+  'KSS-150': '伺服过载',
+  'EST-007': 'Estun 通信超时',
+  'EST-3008': '编码器异常',
+  'ALM-201': 'Yaskawa 绝对位置丢失',
+}
+
+// 统一指令入口：按 robotId 前缀路由到 G1 / Peanut / 工业仿真器
+function applyExternalCommand(command) {
+  if (!command?.robotId || !command.type) return
+  const { robotId, type, params = {} } = command
+  console.log(`[MockControl] ← ${robotId}: ${type}`, params && Object.keys(params).length ? JSON.stringify(params) : '')
+
+  if (robotId.startsWith('UNITREE')) {
+    applyG1Command(type, params)
+    return
+  }
+  if (robotId.startsWith('KEENON') || robotId.startsWith('PEANUT')) {
+    applyPeanutCommand(type, params)
+    return
+  }
+  // 工业机械臂：按 cfg.id 匹配（FANUC_M20iD_001 等）
+  const sim = industrialSims.find((s) => s.cfg.id === robotId)
+  if (sim) {
+    applyIndustrialCommand(sim, type, params)
+  } else {
+    console.warn(`[MockControl] 未知设备 ${robotId}，忽略`)
+  }
+}
+
+// G1 指令：启停/电量/复位/离线
+function applyG1Command(type, params) {
+  switch (type) {
+    case 'start': case 'resume': g1Paused = false; break
+    case 'stop': case 'pause':  g1Paused = true; break
+    case 'reset':               g1Paused = false; g1Battery = 85; g1LastAlertLevel = 100; break
+    case 'set_battery':
+      g1Battery = Math.max(0, Math.min(100, Number(params.level) || 0))
+      g1LastAlertLevel = g1Battery <= 10 ? 10 : g1Battery <= 20 ? 20 : 100 // 避免旧阈值告警重复触发
+      break
+    case 'simulate_offline': {
+      const dur = Number(params.duration_ms) || 30000
+      suppressUntil.set('UNITREE-G1-01', Date.now() + dur)
+      break
+    }
+    default: break // move_to/set_velocity 等对室内巡航仿真暂无对应实现，忽略
+  }
+}
+
+// Peanut 指令：同 G1
+function applyPeanutCommand(type, params) {
+  switch (type) {
+    case 'start': case 'resume': peanutPaused = false; break
+    case 'stop': case 'pause':  peanutPaused = true; break
+    case 'reset':               peanutPaused = false; peanutBattery = 92; break
+    case 'set_battery':         peanutBattery = Math.max(0, Math.min(100, Number(params.level) || 0)); break
+    case 'simulate_offline': {
+      const dur = Number(params.duration_ms) || 30000
+      suppressUntil.set('KEENON-T9-01', Date.now() + dur)
+      break
+    }
+    default: break
+  }
+}
+
+// 工业机械臂指令：状态/关节温度/角度/负载/告警/离线
+// 复用一键演示的注入机制（demoTemp/demoLoad/demoAlarm），告警一次性发帧、
+// 温度负载持续覆盖，与现有 telemetry 广播无缝合并
+function applyIndustrialCommand(sim, type, params) {
+  const now = Date.now()
+  switch (type) {
+    case 'start': case 'resume':
+      sim.mode = 'working'
+      sim.stepIdx = 0
+      sim.seg = null
+      sim.idleAt = now + rand(40e3, 90e3) // 压一下等料窗口，别刚启动就 idle
+      break
+    case 'stop': case 'pause':
+      sim.mode = 'idle'
+      sim.seg = null
+      sim.workAt = now + 3600e3 // 停 1 小时，start 随时可唤醒
+      break
+    case 'reset':
+      sim.demoLoad = null
+      sim.demoTemp = null
+      sim.demoAlarm = null
+      sim.alarm = null
+      sim.mode = 'idle'
+      sim.seg = null
+      sim.workAt = now + 600e3
+      sim.nextAlarmAt = now + rand(30e3, 90e3)
+      break
+    case 'set_joint_temperature':
+      // 持续覆盖指定关节温度 → 下个 telemetry tick 生效，健康分联动由前端算
+      sim.demoTemp = { joint: Number(params.axis) || 1, value: Number(params.temperature) || 35 }
+      break
+    case 'set_joint_angle': {
+      const i = (Number(params.axis) || 1) - 1
+      if (i >= 0 && i < sim.q.length) {
+        sim.q[i] = ((Number(params.angle) || 0) * Math.PI) / 180 // 入参是度，仿真内部用弧度
+        sim.seg = null
+      }
+      break
+    }
+    case 'set_load': {
+      const i = (Number(params.axis) || 1) - 1
+      const base = sim.demoLoad ?? sim.cfg.load
+      if (i >= 0 && i < base.length) {
+        sim.demoLoad = base.map((v, k) => (k === i ? Number(params.load) || 0 : v))
+      }
+      break
+    }
+    case 'trigger_alarm':
+      sim.demoAlarm = {
+        raw_code: params.code || 'SRVO-001',
+        udm_code: `CTRL_${params.code || 'ALARM'}`,
+        severity: params.severity === 'warn' ? 'warning' : (params.severity || 'warning'),
+        zh_desc: CONTROL_ALARM_DESC[params.code] || `操作面板注入告警: ${params.code || ''}`,
+        occurred_at: new Date(now).toISOString(),
+        cleared: false,
+        emitted: false,
+      }
+      break
+    case 'clear_alarm':
+      sim.demoAlarm = null
+      if (sim.alarm) {
+        sim.alarm = null
+        sim.nextAlarmAt = now + rand(50e3, 100e3)
+        sim.seg = null
+      }
+      break
+    case 'simulate_offline': {
+      const dur = Number(params.duration_ms) || 30000
+      suppressUntil.set(sim.cfg.id, now + dur)
+      setTimeout(() => suppressUntil.delete(sim.cfg.id), dur + 1000).unref?.()
+      break
+    }
+    default:
+      // set_battery/set_health_score/custom_telemetry 等只影响 Control Service 本地展示，对仿真无意义
+      break
+  }
+}
+
+// WS 消息统一入口（三个端口共用）：解析 /control 帧
+function handleControlMessage(buf) {
+  try {
+    const msg = JSON.parse(buf.toString())
+    if (msg?.topic === '/control' && msg.data) {
+      applyExternalCommand(msg.data)
+    }
+  } catch {
+    // 心跳等非 JSON 帧，忽略
+  }
+}
+
+// 可选 MQTT 订阅：装了 mqtt 包且本地有 broker 时生效，否则静默走 WS 直连
+async function initMockControlMqtt() {
+  try {
+    const { default: mqtt } = await import('mqtt')
+    const broker = process.env.MQTT_BROKER || 'mqtt://localhost:1883'
+    const client = mqtt.connect(broker, {
+      clientId: 'mock-ws-control',
+      clean: true,
+      connectTimeout: 3000,
+      reconnectPeriod: 5000,
+    })
+    client.on('connect', () => {
+      client.subscribe('industrial/robot/+/command', { qos: 1 })
+      console.log('[MockControl] ✓ MQTT 已订阅: industrial/robot/+/command')
+    })
+    client.on('message', (topic, payload) => {
+      try {
+        applyExternalCommand(JSON.parse(payload.toString()))
+      } catch (e) {
+        console.error('[MockControl] MQTT 指令解析失败:', e.message)
+      }
+    })
+    client.on('error', () => { /* broker 不在很正常，WS 直连兜底 */ })
+  } catch {
+    console.warn('[MockControl] mqtt 模块不可用，仅支持 WS /control 直连模式')
+  }
+}
+initMockControlMqtt()
+
 // ───────────────────────── 宇树 G1（8080）─────────────────────────
 const wssUnitree = new WebSocketServer({ port: 8080 })
 let g1Battery = 85
@@ -115,6 +317,8 @@ function scanDirection(cx, cy, heading, lookAhead = 0.12) {
 // 2026-08-28 广播替代单连接发送：多客户端连接时逐帧 send 只发连接方，
 // 且全局电量若放在 connection 内 interval 会被 N 个连接 N 倍速推进（实测 5 连接电量 5 倍速狂掉）
 function broadcastG1(msg) {
+  // simulate_offline 抑制：操作面板模拟离线期间不出帧（Dashboard 侧判定超时离线）
+  if ((suppressUntil.get('UNITREE-G1-01') ?? 0) > Date.now()) return
   const data = JSON.stringify(msg)
   wssUnitree.clients.forEach((c) => { if (c.readyState === WebSocket.OPEN) c.send(data) })
 }
@@ -125,6 +329,8 @@ let g1TickerStarted = false
 
 wssUnitree.on('connection', (ws) => {
   console.log('[mock] G1 client connected')
+  // 🆕 操作面板控制指令（每个连接都可下发，topic: '/control'）
+  ws.on('message', handleControlMessage)
   if (g1TickerStarted) return
   g1TickerStarted = true
   const interval = setInterval(() => {
@@ -217,42 +423,62 @@ wssUnitree.on('connection', (ws) => {
       console.log(`  扫描详情: ${scanResults.map(r => `${r.dir}=${r.pass1 && r.pass2 ? '✅' : '⛔'}(${r.reason})`).join(' | ')}`)
     }
 
-    // 5. 朝向平滑过渡（避免瞬间拐弯太硬）
-    let hd = bestHeading - g1Heading
-    hd = ((hd + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI
-    const MAX_TURN = 0.15 // 每 tick 最大转向弧度
-    if (Math.abs(hd) <= MAX_TURN) g1Heading = bestHeading
-    else g1Heading += Math.sign(hd) * MAX_TURN
+    // 5~7. 朝向平滑 + 前进 + 边界/碰撞保护 —— 操作面板 stop/pause 时全部冻结
+    if (!g1Paused) {
+      let hd = bestHeading - g1Heading
+      hd = ((hd + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI
+      // 2026-09-08 比例转向 + 角加速度限幅（替代 bang-bang）：
+      // 旧实现恒定 0.15rad/tick 顶格转，起转/停转都是阶跃，拐弯像台车。
+      // 三层处理让转弯呈「起转-保持-滑出」的类人弧线：
+      //   a) 比例律 ω=K·误差：误差大顶格快转，误差收敛按比例减速（ease-out）
+      //   b) 角加速度限幅 3 rad/s²：航点切换瞬间误差是阶跃，纯比例律会立即顶格
+      //      （进弯仍跳变）；限幅后 0.5s 渐进到满速（ease-in）
+      const TURN_GAIN = 6.0       // rad/s per rad 误差（τ≈0.17s 收敛尾）
+      const MAX_TURN_RATE = 1.5   // rad/s 角速度上限
+      const MAX_TURN_ACCEL = 3.0  // rad/s² 角加速度上限
+      if (Math.abs(hd) < 0.02) {
+        g1Heading = bestHeading // 尾部收口，防比例律无限渐近蠕动
+        g1TurnRate = 0
+      } else {
+        const desired = Math.max(-MAX_TURN_RATE, Math.min(MAX_TURN_RATE, hd * TURN_GAIN))
+        const maxStep = MAX_TURN_ACCEL / 10 // tick 10Hz
+        g1TurnRate += Math.max(-maxStep, Math.min(maxStep, desired - g1TurnRate))
+        g1Heading += g1TurnRate / 10
+      }
 
-    // 6. 按当前朝向前进
-    g1Pos.x += Math.cos(g1Heading) * G1_SPEED
-    g1Pos.y += Math.sin(g1Heading) * G1_SPEED
+      // 6. 按当前朝向前进（急转按剩余误差降速，像真人拐弯收步；最低 60%）
+      const turnSlow = 1 - 0.4 * Math.min(Math.abs(hd) / 0.5, 1)
+      g1Pos.x += Math.cos(g1Heading) * G1_SPEED * turnSlow
+      g1Pos.y += Math.sin(g1Heading) * G1_SPEED * turnSlow
 
-    // 7. 边界保护（极端情况下强制回中心）
-    let boundaryHit = false
-    if (g1Pos.x < -2.8) { g1Pos.x = -2.8; boundaryHit = true }
-    if (g1Pos.x >  2.8) { g1Pos.x = 2.8; boundaryHit = true }
-    if (g1Pos.y < -2.3) { g1Pos.y = -2.3; boundaryHit = true }
-    if (g1Pos.y >  2.3) { g1Pos.y = 2.3; boundaryHit = true }
-    if (boundaryHit) {
-      console.log(`[boundary] ⚠️ 触碰边界! 位置=(${g1Pos.x.toFixed(2)},${g1Pos.y.toFixed(2)}) 朝向=${headingToName(g1Heading)}`)
+      // 7. 边界保护（极端情况下强制回中心）
+      let boundaryHit = false
+      if (g1Pos.x < -2.8) { g1Pos.x = -2.8; boundaryHit = true }
+      if (g1Pos.x >  2.8) { g1Pos.x = 2.8; boundaryHit = true }
+      if (g1Pos.y < -2.3) { g1Pos.y = -2.3; boundaryHit = true }
+      if (g1Pos.y >  2.3) { g1Pos.y = 2.3; boundaryHit = true }
+      if (boundaryHit) {
+        console.log(`[boundary] ⚠️ 触碰边界! 位置=(${g1Pos.x.toFixed(2)},${g1Pos.y.toFixed(2)}) 朝向=${headingToName(g1Heading)}`)
+      }
+      if (isObstacle(g1Pos.x, g1Pos.y)) {
+        // 万一钻进了障碍，退一步 + 转向
+        const stuckPos = `(${g1Pos.x.toFixed(2)},${g1Pos.y.toFixed(2)})`
+        const { gx, gy } = worldToGrid(g1Pos.x, g1Pos.y)
+        g1Pos.x -= Math.cos(g1Heading) * G1_SPEED * 2
+        g1Pos.y -= Math.sin(g1Heading) * G1_SPEED * 2
+        g1Heading += Math.PI / 2
+        console.log(
+          `[collision] 💥 穿入障碍! 位置=${stuckPos} 栅格=(${gx},${gy}) ` +
+          `后退后=(${g1Pos.x.toFixed(2)},${g1Pos.y.toFixed(2)}) 新朝向=${headingToName(g1Heading)}`
+        )
+      }
     }
-    if (isObstacle(g1Pos.x, g1Pos.y)) {
-      // 万一钻进了障碍，退一步 + 转向
-      const stuckPos = `(${g1Pos.x.toFixed(2)},${g1Pos.y.toFixed(2)})`
-      const { gx, gy } = worldToGrid(g1Pos.x, g1Pos.y)
-      g1Pos.x -= Math.cos(g1Heading) * G1_SPEED * 2
-      g1Pos.y -= Math.sin(g1Heading) * G1_SPEED * 2
-      g1Heading += Math.PI / 2
-      console.log(
-        `[collision] 💥 穿入障碍! 位置=${stuckPos} 栅格=(${gx},${gy}) ` +
-        `后退后=(${g1Pos.x.toFixed(2)},${g1Pos.y.toFixed(2)}) 新朝向=${headingToName(g1Heading)}`
-      )
-    }
 
-    // 8. 电量递减，到 0 重置
-    g1Battery = Math.max(0, g1Battery - 0.05)
-    if (g1Battery <= 0) { g1Battery = 85; g1LastAlertLevel = 100 }
+    // 8. 电量递减，到 0 重置（暂停时不掉电）
+    if (!g1Paused) {
+      g1Battery = Math.max(0, g1Battery - 0.05)
+      if (g1Battery <= 0) { g1Battery = 85; g1LastAlertLevel = 100 }
+    }
 
     // 9. 室外模式: 沿真实经纬度路线移动 + 广播 /gps 帧
     if (OUTDOOR_MODE) {
@@ -287,8 +513,10 @@ wssUnitree.on('connection', (ws) => {
       })
     }
 
-    const x = Math.round(g1Pos.x * 100) / 100
-    const y = Math.round(g1Pos.y * 100) / 100
+    // 不舍入直接广播全精度坐标：0.01m 舍入会让前端逐 tick 差分航向振荡 ±8°
+    // （前端虽有速度向量 EMA 兜底，但没必要从源头引入噪声）
+    const x = g1Pos.x
+    const y = g1Pos.y
 
     // ─── 统一步态相位 ──────────────────────────────────
     // 所有关节共享同一个 gaitPhase，通过固定相位偏移实现协调
@@ -387,6 +615,8 @@ const PEANUT_SPEED = 0.025
 
 // 2026-08-28 Peanut 与 G1 同策略：状态推进全局单 ticker + 广播，与连接数解耦
 function broadcastKeenon(msg) {
+  // simulate_offline 抑制（同 G1）
+  if ((suppressUntil.get('KEENON-T9-01') ?? 0) > Date.now()) return
   const data = JSON.stringify(msg)
   wssKeenon.clients.forEach((c) => { if (c.readyState === WebSocket.OPEN) c.send(data) })
 }
@@ -395,10 +625,28 @@ let peanutTickerStarted = false
 
 wssKeenon.on('connection', (ws) => {
   console.log('[mock] Peanut client connected')
+  // 🆕 操作面板控制指令
+  ws.on('message', handleControlMessage)
   if (peanutTickerStarted) return
   peanutTickerStarted = true
   const interval = setInterval(() => {
     if (wssKeenon.clients.size === 0) return
+
+    // 🆕 操作面板 stop/pause 冻结：位置/电量都不动，状态帧照常广播
+    if (peanutPaused) {
+      broadcastKeenon({
+        cmd: 'state',
+        payload: {
+          level: Math.round(peanutBattery),
+          v: 36.2 - (92 - peanutBattery) * 0.05,
+          x: Math.round(peanutPos.x * 100) / 100,
+          y: peanutPos.y,
+          angle: peanutDir > 0 ? 0 : 180,
+          status: 2,
+        },
+      })
+      return
+    }
 
     // 安全的 X 方向往返，避开隔墙（x=4 栅格→世界 -1.0 附近是隔墙，所以上限只开到 -1.3）
     peanutPos.x += PEANUT_SPEED * peanutDir
@@ -543,11 +791,28 @@ class IndustrialRobotSim {
     this.workAt = 0                  // 等料结束恢复生产的时刻
     this.temp = [...cfg.temp]        // 关节温度（会慢慢漂）
     this.lastT = Date.now()
+    // 一键演示剧本注入区（null = 不注入，走自然仿真）
+    this.demoLoad = null            // 数组：整组负载覆盖
+    this.demoTemp = null            // { joint, value }：单关节温度覆盖
+    this.demoAlarm = null           // 剧本告警对象
   }
 
   // 推进一个时刻，返回 { q, w, status, alarms }
   sample(now) {
     const c = this.cfg
+
+    // ── 一键演示剧本注入：demoAlarm 由剧本设置/撤除，优先级最高 ──
+    if (this.demoAlarm) {
+      if (!this.alarm) {
+        this.alarm = { ...this.demoAlarm, occurred_at: new Date(now).toISOString(), cleared: false, emitted: false }
+        this.alarmUntil = Infinity // 剧本告警不走自然恢复，由剧本控制解除
+      }
+    } else if (this.alarm && this.alarmUntil === Infinity) {
+      // 剧本撤了告警：立即解除，从当前位置恢复运动
+      this.alarm = null
+      this.nextAlarmAt = now + rand(50e3, 100e3)
+      this.seg = null
+    }
 
     // ── 报警事件：到点触发，持续一阵自己恢复 ──
     if (this.alarm) {
@@ -693,7 +958,7 @@ const ROBOT_SIM_CFG = [
     ],
     vmax: [2.25, 2.1, 2.9, 3.75, 3.1, 4.6],
     amax: [5.6, 5.2, 7.2, 9.4, 7.8, 11.5],
-    load: [85, 118, 45, 30, 25, 18],      // J1 黄色预警 / J2 红色超载是故意的演示数据
+    load: [72, 62, 38, 30, 25, 18],      // 正常基线；超载演示由一键演示剧本动态注入
     temp: [41, 67, 38, 35, 33, 31],
     current: [3.1, 5.4, 2.1, 1.8, 1.2, 0.9],
     health: [88, 54, 92, 95, 97, 99],
@@ -818,6 +1083,110 @@ const ROBOT_SIM_CFG = [
 
 const industrialSims = ROBOT_SIM_CFG.map((cfg) => new IndustrialRobotSim(cfg))
 
+// ───────────── 一键演示剧本 ─────────────
+// BP 路演用：90 秒演完「监测 → 预警 → 告警 → 恢复」闭环
+// 前端发 { topic: '/demo' } 到 8082 触发；剧本直接注入遥测（负载爬升/告警锁定），
+// 告警走正常 industrial_state 通道，前端的 alertStore / AI 洞察 / webhook 全链路都会被自然带动
+const DEMO_ROBOT_ID = 'FANUC_M20iD_001'
+const DEMO_JOINT = 2                 // J2 主轴：负载爬升的主角
+const DEMO_PHASES = [
+  { name: 'ramp',    dur: 22000, label: 'J2 负载持续爬升（黄色预警 → 红色超载）' },
+  { name: 'alarm',   dur: 22000, label: '触发伺服过载告警，关节锁定' },
+  { name: 'recover', dur: 12000, label: '告警解除，负载回落恢复生产' },
+]
+const DEMO_ALARM = { raw_code: 'SRVO-023', udm_code: 'SERVO_OVERLOAD', severity: 'error', zh_desc: '伺服过载（J2 轴电机过热）' }
+const DEMO_BASE_LOAD = [72, 62, 38, 30, 25, 18]   // 正常态（J2 62）
+const DEMO_PEAK_LOAD = [78, 128, 44, 32, 26, 19]  // 告警态（J2 128 红色超载）
+const DEMO_BASE_TEMP = 42                          // J2 正常温度
+const DEMO_PEAK_TEMP = 84                         // J2 过热温度
+
+let demoRun = null  // { sim, t0 }
+
+function demoTotalMs() {
+  return DEMO_PHASES.reduce((s, p) => s + p.dur, 0)
+}
+
+// 推进剧本：每帧调用，往 sim 上注入负载/温度/告警覆盖
+function updateDemo(now) {
+  if (!demoRun) return null
+  const el = now - demoRun.t0
+  const sim = demoRun.sim
+  if (el >= demoTotalMs()) {
+    // 剧本结束：清掉所有注入，回到自然仿真
+    sim.demoLoad = null
+    sim.demoTemp = null
+    sim.demoAlarm = null
+    demoRun = null
+    return { phase: 'done', label: '演示完成', elapsed: el, total: demoTotalMs() }
+  }
+
+  // 找当前所处阶段
+  let acc = 0
+  let phase = DEMO_PHASES[0]
+  let phaseStart = 0
+  for (const p of DEMO_PHASES) {
+    if (el < acc + p.dur) { phase = p; phaseStart = acc; break }
+    acc += p.dur
+  }
+  const p = (el - phaseStart) / phase.dur  // 阶段内进度 0~1
+
+  if (phase.name === 'ramp') {
+    // 负载/温度从基线爬到峰值：80% 前慢（酝酿），后面加速冲红线
+    const ease = p * p
+    sim.demoLoad = DEMO_BASE_LOAD.map((v, i) =>
+      i === DEMO_JOINT - 1 ? Math.round(v + (DEMO_PEAK_LOAD[i] - v) * ease) : v + Math.round(p * 3))
+    sim.demoTemp = { joint: DEMO_JOINT, value: +(DEMO_BASE_TEMP + (DEMO_PEAK_TEMP - DEMO_BASE_TEMP) * ease).toFixed(1) }
+    sim.demoAlarm = null
+  } else if (phase.name === 'alarm') {
+    // 锁定在峰值 + 告警（sample() 里会冻结关节、置 error 状态、发出告警事件）
+    sim.demoLoad = [...DEMO_PEAK_LOAD]
+    sim.demoTemp = { joint: DEMO_JOINT, value: DEMO_PEAK_TEMP }
+    if (!sim.demoAlarm) {
+      sim.demoAlarm = { ...DEMO_ALARM, occurred_at: new Date(now).toISOString(), cleared: false, emitted: false }
+      console.log(`[demo] ⚠️ 触发告警: ${DEMO_ROBOT_ID} ${DEMO_ALARM.raw_code} ${DEMO_ALARM.zh_desc}`)
+    }
+  } else {
+    // 恢复：负载/温度回落，告警解除
+    const back = 1 - p
+    sim.demoLoad = DEMO_PEAK_LOAD.map((v, i) =>
+      i === DEMO_JOINT - 1 ? Math.round(DEMO_BASE_LOAD[i] + (v - DEMO_BASE_LOAD[i]) * back) : DEMO_BASE_LOAD[i])
+    sim.demoTemp = { joint: DEMO_JOINT, value: +(DEMO_PEAK_TEMP + (DEMO_BASE_TEMP - DEMO_PEAK_TEMP) * p).toFixed(1) }
+    sim.demoAlarm = null
+  }
+  return { phase: phase.name, label: phase.label, elapsed: el, total: demoTotalMs() }
+}
+
+function startDemo(robotId) {
+  const sim = industrialSims.find((s) => s.cfg.id === robotId)
+  if (!sim) {
+    console.log(`[demo] 找不到机器人 ${robotId}，忽略`)
+    return false
+  }
+  // 剧本开始前先清场（上一个剧本的残留）
+  sim.demoLoad = null
+  sim.demoTemp = null
+  sim.demoAlarm = null
+  sim.alarm = null
+  // 剧本期间压住随机告警，别让 KSS/SRVO 杂告警抢戏
+  sim.nextAlarmAt = Date.now() + demoTotalMs() + 30e3
+  demoRun = { sim, t0: Date.now() }
+  console.log(`[demo] ▶ 一键演示启动: ${robotId}，总时长 ${demoTotalMs() / 1000}s`)
+  return true
+}
+
+// 演示状态帧（跟遥测同通道广播，前端 demoStore 消费）
+function buildDemoFrame(status) {
+  if (!status) return null
+  return {
+    type: 'demo_status',
+    robotId: DEMO_ROBOT_ID,
+    phase: status.phase,
+    label: status.label,
+    elapsed: Math.round(status.elapsed),
+    total: status.total,
+  }
+}
+
 // 组装一帧工业遥测（UDP 报文格式跟以前保持一致，前端适配器不用改）
 function buildIndustrialFrame(sim) {
   const now = Date.now()
@@ -826,11 +1195,12 @@ function buildIndustrialFrame(sim) {
   const joints = s.q.map((ang, i) => {
     // 运动强度 0~1：负载/电流跟着它起伏，静下来就掉回基线
     const motion = Math.min(1, Math.abs(s.w[i]) / c.vmax[i])
+    const loadBase = sim.demoLoad ?? c.load
     return {
       j: i + 1,
       angle_rad: +ang.toFixed(4),
-      load_pct: Math.round(c.load[i] * (0.97 + 0.06 * motion)),
-      temp_c: +sim.temp[i].toFixed(1),
+      load_pct: Math.round(loadBase[i] * (0.97 + 0.06 * motion)),
+      temp_c: sim.demoTemp && sim.demoTemp.joint === i + 1 ? sim.demoTemp.value : +sim.temp[i].toFixed(1),
       current_a: +(c.current[i] * (0.55 + 0.75 * motion)).toFixed(1),
       speed_rpm: Math.round((Math.abs(s.w[i]) * 60) / (2 * Math.PI)),
       health_score: c.health[i],
@@ -856,24 +1226,52 @@ function buildIndustrialFrame(sim) {
 
 const wssIndustrial = new WebSocketServer({ port: 8082 })
 let industrialIdx = 0
+let demoTick = 0
 
 wssIndustrial.on('connection', (ws) => {
   console.log('[mock] Industrial client connected')
   // 连接后立即推一台
   ws.send(JSON.stringify(buildIndustrialFrame(industrialSims[0])))
+  // 指令入口：/demo 一键演示（前端 demoStore）+ /control 操作面板控制指令
+  ws.on('message', (buf) => {
+    try {
+      const msg = JSON.parse(buf.toString())
+      if (msg?.topic === '/demo') {
+        startDemo(msg.data?.robotId || DEMO_ROBOT_ID)
+      } else if (msg?.topic === '/control' && msg.data) {
+        applyExternalCommand(msg.data)
+      }
+    } catch {
+      // 心跳等非 JSON 帧，忽略
+    }
+  })
 })
 
 // 125ms 轮流广播一台（每台 2Hz，总 8 帧/s）
 // 以前 5s 才轮一台，运动仿真需要密一点的采样才能看出梯形速度曲线
 setInterval(() => {
   if (wssIndustrial.clients.size === 0) return
-  industrialIdx = (industrialIdx + 1) % industrialSims.length
-  const data = JSON.stringify(buildIndustrialFrame(industrialSims[industrialIdx]))
+  // 演示剧本推进（每 tick 一次，注入到目标 sim 上）
+  const demoStatus = updateDemo(Date.now())
+  // 🆕 simulate_offline 抑制：被操作面板置离线的机器人跳过广播
+  let sim = null
+  for (let i = 0; i < industrialSims.length; i++) {
+    industrialIdx = (industrialIdx + 1) % industrialSims.length
+    const candidate = industrialSims[industrialIdx]
+    if ((suppressUntil.get(candidate.cfg.id) ?? 0) < Date.now()) { sim = candidate; break }
+  }
+  if (!sim) return
+  const data = JSON.stringify(buildIndustrialFrame(sim))
   wssIndustrial.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(data)
+      // 演示状态帧 4 倍降频（2Hz），done 帧只发一次不降频
+      if (demoStatus && (demoTick % 4 === 0 || demoStatus.phase === 'done')) {
+        client.send(JSON.stringify(buildDemoFrame(demoStatus)))
+      }
     }
   })
+  demoTick++
 }, 125)
 
 console.log('[mock] WS servers running:')

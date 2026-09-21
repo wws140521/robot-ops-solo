@@ -1,7 +1,8 @@
 import { useAlertStore } from '../stores/alertStore'
 import { useSpeakStore } from '../stores/speakStore'
+import { useNavigate } from 'react-router-dom'
 import { useState, useMemo } from 'react'
-import { AlertOctagon, AlertTriangle, Info, CheckCheck, Trash2, RadioTower } from 'lucide-react'
+import { AlertOctagon, AlertTriangle, Info, CheckCheck, Trash2, RadioTower, Crosshair } from 'lucide-react'
 import { GlassCard, TaskTimeline, type TimelineItem, StatusDot } from 'ui-kit'
 import './AlertsPage.css'
 
@@ -19,6 +20,16 @@ function parseIndustrialAlert(message: string): { rawCode: string; zhDesc: strin
   return { rawCode, zhDesc: match[2] }
 }
 
+// 从告警消息解析故障关节号（J2 / 关节 2 / 2轴），供 3D 联动闪烁定位
+// 解析不到返回 null（只做相机飞行聚焦，不闪关节）
+function parseFaultJoint(message: string): number | null {
+  const m =
+    message.match(/J\s*([1-6])/i) ??
+    message.match(/关节\s*([1-6])/) ??
+    message.match(/([1-6])\s*轴/)
+  return m ? Number(m[1]) : null
+}
+
 // 告警中心页面
 export function AlertsPage() {
   const alerts = useAlertStore((s) => s.alerts)
@@ -30,6 +41,14 @@ export function AlertsPage() {
   const [filter, setFilter] = useState<FilterLevel>('all')
   const [search, setSearch] = useState('')
   const [readIds, setReadIds] = useState<Set<number>>(new Set())
+  const navigate = useNavigate()
+
+  // 告警→3D 联动：点击条目跳转孪生舰队视图，相机飞到该机器人 + 故障关节闪烁
+  // t=Date.now() 让重复点击同一告警也能重新触发一次相机飞行
+  const locateRobot = (alert: { robotId: string; message: string }) => {
+    const joint = parseFaultJoint(alert.message)
+    navigate(`/twin?focus=${encodeURIComponent(alert.robotId)}${joint ? `&joint=${joint}` : ''}&t=${Date.now()}`)
+  }
 
   const handleMarkAllRead = () => {
     markAllRead()
@@ -144,7 +163,7 @@ export function AlertsPage() {
               fontFamily: 'var(--font-mono)',
             }}
           >
-            {filteredAlerts.length} RECORDS
+            点击条目定位 3D 视图 · {filteredAlerts.length} RECORDS
           </span>
         </div>
 
@@ -168,6 +187,7 @@ export function AlertsPage() {
                     if (!isRead) {
                       setReadIds((prev) => new Set(prev).add(alert.timestamp))
                     }
+                    locateRobot(alert)
                   }}
                 >
                   <div className="alerts-card-level-bar" />
@@ -181,6 +201,9 @@ export function AlertsPage() {
                         <span className="alerts-card-code">[{alert.code}]</span>
                       </div>
                       <div className="alerts-card-time">
+                        <span className="alerts-card-locate">
+                          <Crosshair size={12} /> 3D 定位
+                        </span>
                         {new Date(alert.timestamp).toLocaleTimeString()}
                       </div>
                     </div>
